@@ -6,9 +6,8 @@
 #include "defs.h"
 #include "param.h"
 #include "fs.h"
-#include "spinlock.h"
-#include "sleeplock.h"
 #include "file.h"
+#include "spinlock.h"
 
 struct devsw devsw[NDEV];
 struct {
@@ -69,13 +68,13 @@ fileclose(struct file *f)
   f->ref = 0;
   f->type = FD_NONE;
   release(&ftable.lock);
-
+  
   if(ff.type == FD_PIPE)
     pipeclose(ff.pipe, ff.writable);
   else if(ff.type == FD_INODE){
-    begin_op();
+    begin_trans();
     iput(ff.ip);
-    end_op();
+    commit_trans();
   }
 }
 
@@ -130,19 +129,19 @@ filewrite(struct file *f, char *addr, int n)
     // and 2 blocks of slop for non-aligned writes.
     // this really belongs lower down, since writei()
     // might be writing a device like the console.
-    int max = ((MAXOPBLOCKS-1-1-2) / 2) * 512;
+    int max = ((LOGSIZE-1-1-2) / 2) * 512;
     int i = 0;
     while(i < n){
       int n1 = n - i;
       if(n1 > max)
         n1 = max;
 
-      begin_op();
+      begin_trans();
       ilock(f->ip);
       if ((r = writei(f->ip, addr + i, f->off, n1)) > 0)
         f->off += r;
       iunlock(f->ip);
-      end_op();
+      commit_trans();
 
       if(r < 0)
         break;

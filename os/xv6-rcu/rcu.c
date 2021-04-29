@@ -9,28 +9,24 @@
 
 void rcu_read_lock()
 {
-  pushcli();
-  preempt_disable();
-  popcli();
+    preempt_disable();
 }
 
 void rcu_read_unlock()
 {
-  pushcli();
-  preempt_enable();
-  popcli();
+    preempt_enable();
 }
 
 void call_rcu()
 {
     // Schedule this process to run in all the cpus.
     int i = 0;
-    while (i < ncpu) {
-        cprintf ("\nInside call rcu setting myproc() allowed cpu to %d", i);
-        myproc()->allowed_cpu =  i++;
-        yield();        
+    while (i < 2) {
+        cprintf ("\nInside call rcu setting proc allowed cpu to %d", i);
+        proc->allowed_cpu =  i++;
+        yield();
     }
-    myproc()->allowed_cpu = -1;
+    proc->allowed_cpu = -1;
     // You are good to go.
     cprintf ("\n RCU wait done!");
 }
