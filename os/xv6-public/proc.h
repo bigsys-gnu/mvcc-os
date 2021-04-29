@@ -8,7 +8,22 @@ struct cpu {
   int ncli;                    // Depth of pushcli nesting.
   int intena;                  // Were interrupts enabled before pushcli?
   struct proc *proc;           // The process running on this cpu or null
+  // RCU prempt disable flag.
+
+  uint preempt_disable_count;
 };
+
+
+#define preempt_disable()                       \
+  do {                                          \
+    mycpu()->preempt_disable_count++;           \
+  } while (0)
+
+#define preempt_enable()                        \
+  do {                                          \
+    mycpu()->preempt_disable_count--;           \
+  } while (0)
+
 
 extern struct cpu cpus[NCPU];
 extern int ncpu;
@@ -49,6 +64,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  char allowed_cpu;           // Enable process affinity
 };
 
 // Process memory is laid out contiguously, low addresses first:

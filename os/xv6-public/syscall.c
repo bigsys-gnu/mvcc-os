@@ -103,6 +103,9 @@ extern int sys_unlink(void);
 extern int sys_wait(void);
 extern int sys_write(void);
 extern int sys_uptime(void);
+extern int sys_rcuwait(void);
+extern int sys_rcureadunlock(void);
+extern int sys_rcureadlock(void);
 
 static int (*syscalls[])(void) = {
 [SYS_fork]    sys_fork,
@@ -126,6 +129,9 @@ static int (*syscalls[])(void) = {
 [SYS_link]    sys_link,
 [SYS_mkdir]   sys_mkdir,
 [SYS_close]   sys_close,
+[SYS_rcuwait] sys_rcuwait,
+[SYS_rcureadlock] sys_rcureadlock,
+[SYS_rcureadunlock] sys_rcureadunlock,
 };
 
 void
