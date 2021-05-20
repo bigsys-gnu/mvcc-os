@@ -26,7 +26,9 @@ USER_PROGS := \
 	test_fork\
 	basic_thread\
 	clone3-test\
-	zombie
+	zombie\
+	benchlist\
+	list_rcu\
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -35,7 +37,8 @@ USER_LIBS := \
 	umalloc.o\
 	ulib.o\
 	usys.o\
-	printf.o
+	printf.o\
+	new-urcu.o\
 	
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
