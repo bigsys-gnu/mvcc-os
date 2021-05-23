@@ -105,6 +105,7 @@ static int (*syscalls[])(void) = {
 [SYS_wait]    sys_wait,
 [SYS_join]    sys_join,
 [SYS_write]   sys_write,
+[SYS_uptime]  sys_uptime,
 [SYS_rcu_init]  sys_rcu_init,
 [SYS_rcu_reader_lock]  sys_rcu_reader_lock,
 [SYS_rcu_reader_unlock]  sys_rcu_reader_unlock,

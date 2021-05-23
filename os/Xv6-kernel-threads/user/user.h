@@ -52,13 +52,13 @@ void lock_release(lock_t *lk);
 
 // rcu syscall
 void rcu_init(int num_threads);
-void rcu_reader_lock();
-void rcu_reader_unlock();
+void rcu_reader_lock(void);
+void rcu_reader_unlock(void);
 void rcu_writer_lock(int lock_id);
 void rcu_writer_unlock(int lock_id);
-void rcu_synchronize(); 
+void rcu_synchronize(void); 
 void rcu_register(int id);
-void rcu_unregister();
+void rcu_unregister(void);
 void rcu_free(void *ptr);
 
 #endif // _USER_H_

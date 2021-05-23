@@ -172,7 +172,7 @@ sys_rcu_synchronize(void)
 }
 
 int
-sys_rcu_register(int id)
+sys_rcu_register(void)
 {
   int id;
   
@@ -194,16 +194,20 @@ sys_rcu_unregister(void)
   return 1234;
 }
 
+/* get int parameter as a casted pointer value. */
 int
 sys_rcu_free(void)
 {
+  int int_ptr;
   void *ptr;
   
-  if (argint(0, &ptr) < 0)
+  if (argint(0, &int_ptr) < 0)
 	return -1;
+
+  ptr = (void *)int_ptr;
 
   /* call implement here! */
 
   /* just for debugging */
-  return ptr;
+  return (int)ptr;
 }
