@@ -100,3 +100,110 @@ sys_uptime(void)
   release(&tickslock);
   return xticks;
 }
+
+// rcu rapper
+int
+sys_rcu_init(void)
+{
+  int num_threads;
+  
+  if (argint(0, &num_threads) < 0)
+	return -1;
+
+  /* call implement here! */
+
+  /* just for debugging */
+  return num_threads;
+}
+
+int
+sys_rcu_reader_lock(void)
+{
+  /* call implement here! */
+
+  /* just for debugging */
+  return 1234;
+}
+
+int
+sys_rcu_reader_unlock(void)
+{
+  /* call implement here! */
+
+  /* just for debugging */
+  return 1234;
+}
+
+int
+sys_rcu_writer_lock(void)
+{
+  int lock_id;
+  
+  if (argint(0, &lock_id) < 0)
+	return -1;
+
+  /* call implement here! */
+
+  /* just for debugging */
+  return lock_id;
+}
+
+int
+sys_rcu_writer_unlock(void)
+{
+  int lock_id;
+  
+  if (argint(0, &lock_id) < 0)
+	return -1;
+
+  /* call implement here! */
+
+  /* just for debugging */
+  return lock_id;
+}
+
+int
+sys_rcu_synchronize(void)
+{
+  /* call implement here! */
+
+  /* just for debugging */
+  return 1234;
+}
+
+int
+sys_rcu_register(int id)
+{
+  int id;
+  
+  if (argint(0, &id) < 0)
+	return -1;
+
+  /* call implement here! */
+
+  /* just for debugging */
+  return id;
+}
+
+int
+sys_rcu_unregister(void)
+{
+  /* call implement here! */
+
+  /* just for debugging */
+  return 1234;
+}
+
+int
+sys_rcu_free(void)
+{
+  void *ptr;
+  
+  if (argint(0, &ptr) < 0)
+	return -1;
+
+  /* call implement here! */
+
+  /* just for debugging */
+  return ptr;
+}

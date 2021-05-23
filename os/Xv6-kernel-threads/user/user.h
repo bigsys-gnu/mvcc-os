@@ -50,5 +50,16 @@ int lock_init(lock_t *lk);
 void lock_acquire(lock_t *lk);
 void lock_release(lock_t *lk);
 
+// rcu syscall
+void rcu_init(int num_threads);
+void rcu_reader_lock();
+void rcu_reader_unlock();
+void rcu_writer_lock(int lock_id);
+void rcu_writer_unlock(int lock_id);
+void rcu_synchronize(); 
+void rcu_register(int id);
+void rcu_unregister();
+void rcu_free(void *ptr);
+
 #endif // _USER_H_
 
