@@ -131,7 +131,7 @@ sys_rcu_reader_unlock(void)
   /* call implement here! */
 
   /* just for debugging */
-  return 1234;
+  return 4321;
 }
 
 int
