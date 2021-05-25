@@ -104,7 +104,7 @@ void list_insert(int key, spinlock_list_t *list)
     return;
 }
 
-void list_delete(int key, spinlock_list_t *list)
+void list_delete(struct urcu_data *ud, int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret = 0;
@@ -131,33 +131,35 @@ void list_delete(int key, spinlock_list_t *list)
     {
         //node to delete with key value
         prev->next = cur->next;
-        free(cur);
+		urcu_writer_unlock(list->id);
+		urcu_synchronize(ud);
+		free(cur);
         printf(1, "delete node value : %d\tpid : %d\n", key, getpid());
     }
     else{
         printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
-    }
+		urcu_writer_unlock(list->id);
+	}
     // lock_release(list->lk);
-    urcu_writer_unlock(list->id);
 
     return;
 
 }
 
-int list_find(int key, spinlock_list_t *list)
+int list_find(struct urcu_data *ud, int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret, val;
 
     // lock_acquire(list->lk);
-    urcu_reader_lock();
+    urcu_reader_lock(ud);
     for(prev = list->head, cur = prev->next; cur!=NULL; prev = cur, cur = cur ->next){
         if((val= cur->value) >= key)
             break;
     ret = (val == key);
     printf(1, "ret: %d\n", ret);
     // lock_release(list->lk);
-    urcu_reader_unlock();
+    urcu_reader_unlock(ud);
     }
     exit();
 }
@@ -168,6 +170,9 @@ void test(void* ptr)
     value = 1;//sys_uptime();
     int insert_time = 0;
     int delete_time = 0;
+	struct urcu_data ud;
+
+	urcu_register(&ud);
 
     // temporary.. need to implement gathering thread id
     printf(1, "1");
@@ -187,8 +192,8 @@ void test(void* ptr)
             insert_time++;
         }
         else{
-            list_delete(value, (spinlock_list_t*)ptr);
-            delete_time++;
+		    list_delete(&ud, value, (spinlock_list_t*)ptr);
+			delete_time++;
         }
         value++;
     }
@@ -217,8 +222,8 @@ int main()
 
     int join_pid1 = thread_join();
     int join_pid2 = thread_join();
-    assert(join_pid1 == thread_pid1);
-    assert(join_pid2 == thread_pid2);
+	printf(1, "thread: %d\n", join_pid1);
+	printf(1, "thread: %d\n", join_pid2);
 
     printf(1, "bench_list end\n");
 

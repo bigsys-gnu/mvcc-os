@@ -43,15 +43,20 @@ int ppid;
    exit(); \
 }
 
+struct urcu_data {
+  long *times;
+  int id;
+};
+
 void urcu_init(int num_threads);
-void urcu_reader_lock();
-void urcu_reader_unlock();
+void urcu_reader_lock(struct urcu_data *ud);
+void urcu_reader_unlock(struct urcu_data *ud);
 void urcu_writer_lock(int lock_id);
 void urcu_writer_unlock(int lock_id);
-void urcu_synchronize(); 
-void urcu_register(int id);
-void urcu_unregister();
-void urcu_free(void *ptr);
+void urcu_synchronize(struct urcu_data *ud);
+void urcu_register(struct urcu_data *ud);
+void urcu_unregister(struct urcu_data *ud);
+void urcu_free(struct urcu_data *ud, void *ptr);
 
 #else
 

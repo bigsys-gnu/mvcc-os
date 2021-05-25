@@ -196,8 +196,9 @@ int main()
 
     int join_pid1 = thread_join();
     int join_pid2 = thread_join();
-    assert(join_pid1 == thread_pid1);
-    assert(join_pid2 == thread_pid2);
+
+	printf(1, "thread: %d\n", join_pid1);
+	printf(1, "thread: %d\n", join_pid2);
 
     printf(1, "bench_list end\n");
 

@@ -69,25 +69,25 @@ void urcu_init(int num_threads){
     return; 
 }
 
-__thread long* times = NULL; 
-__thread int i; 
+/* __thread long* times = NULL;  */
+/* __thread int i; */
 
-void urcu_register(int id){
+void urcu_register(struct urcu_data *ud){
     printf(1, "test");
-    times = (long*) malloc(sizeof(long)*threads);
-    i = id; 
-    if (times == NULL ){
+    ud->times = (long*) malloc(sizeof(long)*threads);
+    ud->id = getpid(); 
+    if (ud->times == NULL ){
         printf(1, "malloc failed\n");
         exit();
     }
 }
-void urcu_unregister(){
-    free(times);
+void urcu_unregister(struct urcu_data *ud){
+    free(ud->times);
 }
 
-void urcu_reader_lock(){
-    assert(urcu_table[i] != NULL);
-    __sync_add_and_fetch(&urcu_table[i]->time, 1);
+void urcu_reader_lock(struct urcu_data *ud){
+    assert(urcu_table[ud->id] != NULL);
+    __sync_add_and_fetch(&urcu_table[ud->id]->time, 1);
 }
 
 
@@ -95,9 +95,9 @@ static inline void set_bit(int nr, volatile unsigned long *addr){
     asm("btsl %1,%0" : "+m" (*addr) : "Ir" (nr));
 }
 
-void urcu_reader_unlock(){
-    assert(urcu_table[i]!= NULL);
-    set_bit(0, (unsigned long *)&urcu_table[i]->time);
+void urcu_reader_unlock(struct urcu_data *ud){
+    assert(urcu_table[ud->id]!= NULL);
+    set_bit(0, (unsigned long *)&urcu_table[ud->id]->time);
 }
 
 void urcu_writer_lock(int lock_id){
@@ -108,37 +108,37 @@ void urcu_writer_unlock(int lock_id){
 	lock_release(&(urcu_spin[lock_id]));
 }
 
-void urcu_synchronize(){
+void urcu_synchronize(struct urcu_data *ud){
     int i; 
     //read old counters
     for( i=0; i<threads ; i++){
-        times[i] = urcu_table[i]->time;
+        ud->times[i] = urcu_table[i]->time;
     }
     for( i=0; i<threads ; i++){
-        if (times[i] & 1) continue;
+        if (ud->times[i] & 1) continue;
         while(1){
             unsigned long t = urcu_table[i]->time;
-            if (t & 1 || t > times[i]){
+            if (t & 1 || t > ud->times[i]){
                 break; 
             }
         }
     }
 }
 
-void urcu_free(void *ptr) {
+void urcu_free(struct urcu_data *ud, void *ptr) {
 	int k;
 	
-	urcu_table[i]->free_ptrs[urcu_table[i]->f_size] = ptr;
-	urcu_table[i]->f_size++;
+	urcu_table[ud->id]->free_ptrs[urcu_table[ud->id]->f_size] = ptr;
+	urcu_table[ud->id]->f_size++;
 	
-	if (urcu_table[i]->f_size == URCU_MAX_FREE_PTRS) {
+	if (urcu_table[ud->id]->f_size == URCU_MAX_FREE_PTRS) {
 		
-		urcu_synchronize();
+		urcu_synchronize(ud);
 		
-		for (k = 0; k < urcu_table[i]->f_size; k++) {
-			free(urcu_table[i]->free_ptrs[k]);
+		for (k = 0; k < urcu_table[ud->id]->f_size; k++) {
+			free(urcu_table[ud->id]->free_ptrs[k]);
 		}
 		
-		urcu_table[i]->f_size = 0;
+		urcu_table[ud->id]->f_size = 0;
 	}
 }
