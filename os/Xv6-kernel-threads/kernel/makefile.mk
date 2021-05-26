@@ -22,6 +22,7 @@ KERNEL_OBJECTS := \
 	syscall.o\
 	sysfile.o\
 	sysproc.o\
+	sysrcu.o\
 	timer.o\
 	trapasm.o\
 	trap.o\

@@ -1,5 +1,4 @@
 #include "krcu.h"
-#include "spinlock.h"
 #include "mmu.h"
 #include "param.h"
 #include "x86.h"
@@ -29,11 +28,6 @@
  * Authors Maya Arbel and Adam Morrison 
  */
 
-
-#define MAX_SPIN_LOCKS (10000)
-
-struct spinlock urcu_spin[MAX_SPIN_LOCKS];
-
 void rcu_init(struct rcu_maintain *rm, int num_threads)
 {
   rcu_node **result = (rcu_node**) malloc(sizeof(rcu_node)*num_threads);
@@ -53,7 +47,7 @@ void rcu_init(struct rcu_maintain *rm, int num_threads)
 
   /* need to be fixed. */
   for (i = 0; i < MAX_SPIN_LOCKS; i++)
-	initlock(&(urcu_spin[i]), "rcu");
+	initlock(&(rm->urcu_spin[i]), "rcu");
 
   return; 
 }
@@ -89,15 +83,17 @@ void rcu_reader_unlock(struct rcu_maintain *rm, struct rcu_data *d)
 }
 
 /* need to be fixed */
-void rcu_writer_lock(int lock_id)
+void rcu_writer_lock(struct rcu_maintain *rm, int lock_id)
 {
-  acquire(&(urcu_spin[lock_id]));
+  assert(lock_id < MAX_SPIN_LOCKS);
+  acquire(&(rm->urcu_spin[lock_id]));
 }
 
 /* need to be fixed */
-void rcu_writer_unlock(int lock_id)
+void rcu_writer_unlock(struct rcu_maintain *rm, int lock_id)
 {
-	release(&(urcu_spin[lock_id]));
+  assert(lock_id < MAX_SPIN_LOCKS);
+  release(&(rm->urcu_spin[lock_id]));
 }
 
 void rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d)

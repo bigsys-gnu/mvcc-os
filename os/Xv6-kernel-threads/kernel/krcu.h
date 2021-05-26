@@ -25,15 +25,26 @@
 #include "rcu.h"
 #include "types.h"
 #include "defs.h"
+#include "spinlock.h"
 
 #define assert(CONDITION)\
-  if (!CONDITION)		 \
-	panic(#CONDITION);	 \
+  if (!(CONDITION))		 \
+	panic(#CONDITION)	 \
+
+#define MAX_SPIN_LOCKS (10)
+
+typedef struct rcu_node_t {
+    volatile long time; 
+	int f_size;
+	void *free_ptrs[RCU_MAX_FREE_PTRS];
+	char p[184];
+} rcu_node;
 
 /* rcu_maintain is for rcu maintain thread. */
 struct rcu_maintain {
   int threads;
   rcu_node **rcu_table;
+  struct spinlock urcu_spin[MAX_SPIN_LOCKS];
 };
 
 #endif /* _K_RCU_H_ */
