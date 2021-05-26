@@ -27,9 +27,9 @@ USER_PROGS := \
 	basic_thread\
 	clone3-test\
 	zombie\
-	benchlist\
-	rcu_test\
-	list_rcu\
+	# benchlist\
+	# rcu_test\
+	# list_rcu\
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -39,7 +39,7 @@ USER_LIBS := \
 	ulib.o\
 	usys.o\
 	printf.o\
-	new-urcu.o\
+	# new-urcu.o\
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
 

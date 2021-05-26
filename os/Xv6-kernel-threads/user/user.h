@@ -2,6 +2,7 @@
 #define _USER_H_
 
 struct stat;
+struct rcu_data;
 typedef struct __lock_t{
 	uint flag;
 }lock_t;
@@ -51,15 +52,15 @@ void lock_acquire(lock_t *lk);
 void lock_release(lock_t *lk);
 
 // rcu syscall
-int rcu_init(int num_threads);
-int rcu_reader_lock(void);
-int rcu_reader_unlock(void);
-int rcu_writer_lock(int lock_id);
-int rcu_writer_unlock(int lock_id);
-int rcu_synchronize(void); 
-int rcu_register(int id);
-int rcu_unregister(void);
-int rcu_free(void *ptr);
+void rcu_init(int num_threads);
+void rcu_reader_lock(struct rcu_data *d);
+void rcu_reader_unlock(struct rcu_data *d);
+void rcu_writer_lock(int lock_id);
+void rcu_writer_unlock(int lock_id);
+void rcu_synchronize(struct rcu_data *d);
+void rcu_register(struct rcu_data *d);
+void rcu_unregister(struct rcu_data *d);
+void rcu_free(struct rcu_data *d, void *ptr);
 
 #endif // _USER_H_
 

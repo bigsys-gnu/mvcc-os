@@ -10,6 +10,8 @@
 #define SEG_TSS   6  // this process's task state
 #define NSEGS     7
 
+#include "krcu.h"
+
 // Per-CPU state
 struct cpu {
   uchar id;                    // Local APIC ID; index into cpus[] below
@@ -75,6 +77,7 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
+  struct rcu_maintain rm;	   // If this thread maintain rcu data then use this.
 };
 
 // Process memory is laid out contiguously, low addresses first:
