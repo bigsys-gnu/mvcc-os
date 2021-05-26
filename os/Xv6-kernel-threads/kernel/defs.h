@@ -171,6 +171,20 @@ void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
 
+// rcu.c
+int rcu_init(int num_threads);
+int rcu_reader_lock(void);
+int rcu_reader_unlock(void);
+int rcu_writer_lock(int lock_id);
+int rcu_writer_unlock(int lock_id);
+int rcu_synchronize(void); 
+int rcu_register(int id);
+int rcu_unregister(void);
+int rcu_free(void *ptr);
+
+
+
+
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 

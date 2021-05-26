@@ -10,6 +10,16 @@ __*.txt
 *.pyc
 
 sync/bin
+os/Xv6-kernel-threads/bootother
+os/Xv6-kernel-threads/fs/*
+os/Xv6-kernel-threads/initcode
+os/Xv6-kernel-threads/kernel/bootblock
+os/Xv6-kernel-threads/kernel/kernel
+os/Xv6-kernel-threads/kernel/vectors.S
+os/Xv6-kernel-threads/tools/mkfs
+os/Xv6-kernel-threads/user/bin/
+os/Xv6-kernel-threads/xv6.img
+
 
 # Prerequisites
 *.d
