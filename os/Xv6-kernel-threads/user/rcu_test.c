@@ -3,40 +3,101 @@
 */
 
 #include "types.h"
-#include "stat.h"
 #include "user.h"
+#include "fs.h"
+#include "param.h"
+#include "stat.h"
+#include "x86.h"
+#include "rcu.h"
+
+#define THREAD_NUM 35
+/* #define LOCK_ID 0 */
+
+
+struct rcu_maintain rm;
+lock_t lk;
+
+
+/* rcu example from https://www.kernel.org/doc/html/latest/RCU/whatisRCU.html#id6 */
+
+struct foo {
+  int a;
+  char b;
+  long c;
+};
+
+struct foo *global_foo;
+
+void foo_update_a(struct rcu_data *rd, int new_a)
+{
+  struct foo *new_fp;
+  struct foo *old_fp;
+
+  new_fp = (struct foo *) malloc(sizeof(*new_fp));
+  /* rcu_writer_lock(&rm, LOCK_ID); */
+  lock_acquire(&lk);
+  old_fp = global_foo;
+  *new_fp = *old_fp;
+  new_fp->a = new_a;
+  global_foo = new_fp;
+  /* rcu_writer_unlock(&rm, LOCK_ID); */
+  lock_release(&lk);
+  rcu_synchronize(&rm, rd);
+  free(old_fp);
+}
+
+int foo_get_a(struct rcu_data *rd)
+{
+  int retval;
+
+  rcu_reader_lock(&rm, rd);
+  retval = global_foo->a;
+  printf(1, "foo_get_a %d\n", retval);
+  rcu_reader_unlock(&rm, rd);
+  return retval;
+}
+
+void worker(void *ptr)
+{
+  struct rcu_data rd;
+  int i;
+
+  rd.id = *(int *)ptr;
+  printf(1, "id: %d\n", rd.id);
+  rcu_register(&rm, &rd);
+
+  for (i = 0; i < 30; ++i)
+	{
+	  printf(1, "thread %d: val: %d\n", getpid(), foo_get_a(&rd));
+	  foo_update_a(&rd, i);
+	}
+  rcu_unregister(&rd);
+
+  exit();
+}
 
 int
 main(void)
 {
-  int result = 0;
+  int i;
+  int tid_list[THREAD_NUM];
 
-  result = rcu_init(33);
-  printf(1, "rcu_init %d\n", result);
+  rcu_init(&rm, THREAD_NUM);
+  printf(1, "on user rm: %p\n", &rm);
+  lock_init(&lk);
+  global_foo = (struct foo *) malloc(sizeof(struct foo));
+  global_foo->a = 1;
+  global_foo->b = 'a';
+  global_foo->c = 2;
 
-  result = rcu_reader_lock();
-  printf(1, "rcu_reader_lock %d\n", result);
+  for (i = 0; i < THREAD_NUM; ++i)
+	{
+	  tid_list[i] = i;
+	  thread_create(worker, &tid_list[i]);
+	}
 
-  result = rcu_reader_unlock();
-  printf(1, "rcu_reader_unlock %d\n", result);
-
-  result = rcu_writer_lock(13579);
-  printf(1, "rcu_writer_lock %d\n", result);
-
-  result = rcu_writer_unlock(13579);
-  printf(1, "rcu_writer_unlock %d\n", result);
-
-  result = rcu_synchronize();
-  printf(1, "rcu_synchronize %d\n", result);
-
-  result = rcu_register(3131);
-  printf(1, "rcu_register %d\n", result);
-
-  result = rcu_unregister();
-  printf(1, "rcu_unregister %d\n", result);
-
-  result = rcu_free((void *)10101);
-  printf(1, "rcu_free %d\n", result);
-
+  for (i = 0; i < THREAD_NUM; ++i)
+	thread_join();
+  
   exit();
 }

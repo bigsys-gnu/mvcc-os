@@ -22,12 +22,15 @@ KERNEL_OBJECTS := \
 	syscall.o\
 	sysfile.o\
 	sysproc.o\
+	sysrcu.o\
 	timer.o\
 	trapasm.o\
 	trap.o\
 	uart.o\
 	vectors.o\
 	vm.o\
+	krcu.o\
+	malloc.o\
 
 KERNEL_OBJECTS := $(addprefix kernel/, $(KERNEL_OBJECTS))
 
