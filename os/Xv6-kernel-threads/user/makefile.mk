@@ -27,8 +27,8 @@ USER_PROGS := \
 	basic_thread\
 	clone3-test\
 	zombie\
+	rcu_test\
 	# benchlist\
-	# rcu_test\
 	# list_rcu\
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))

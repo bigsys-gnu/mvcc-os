@@ -77,7 +77,6 @@ struct proc {
   struct file *ofile[NOFILE];  // Open files
   struct inode *cwd;           // Current directory
   char name[16];               // Process name (debugging)
-  struct rcu_maintain rm;	   // If this thread maintain rcu data then use this.
 };
 
 // Process memory is laid out contiguously, low addresses first:

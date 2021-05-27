@@ -26,6 +26,8 @@ static Header *freep;
 char *
 sbrk(int n)
 {
+  if (proc == 0)
+	return (char *)-1;
   uint addr = proc->sz;
   if(growproc(n) < 0)
     return (char *)-1;
