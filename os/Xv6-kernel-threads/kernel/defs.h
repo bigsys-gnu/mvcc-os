@@ -181,11 +181,6 @@ void rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d);
 void rcu_register(struct rcu_maintain *rm, struct rcu_data *d);
 void rcu_unregister(struct rcu_data *d);
 
-// malloc.c
-void * malloc(uint nbytes);
-void free(void *ap);
-
-
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))
 
