@@ -11,7 +11,6 @@
 #include "rcu.h"
 
 #define THREAD_NUM 35
-/* #define LOCK_ID 0 */
 
 uint total_write;
 uint per_thread_write[THREAD_NUM];
@@ -20,6 +19,14 @@ int sanity_failed;
 #define COUNT_WRITE(ID)\
   __sync_add_and_fetch(&total_write, 1); \
   per_thread_write[ID]++
+
+#define SEGMENTATION_FAULT_CHECK(FOO_PTR)\
+  if (FOO_PTR->freed) \
+	__sync_add_and_fetch(&sanity_failed, 1)
+
+#define FREE_FOO(FOO_PTR)\
+	FOO_PTR->freed = 1;	 \
+	free(FOO_PTR)
 
 struct rcu_maintain rm;
 lock_t lk;						/* rcu write lock */
@@ -34,27 +41,37 @@ struct foo {
 
 struct foo *global_foo;
 
+struct foo *
+create_foo(int new_a)
+{
+  struct foo *new_fp = (struct foo *) malloc(sizeof(struct foo));
+
+  if (new_fp)
+	{
+	  new_fp->a = new_a;
+	  new_fp->freed = 0;
+	}
+  return new_fp;
+}
+
 void foo_update_a(struct rcu_data *rd, int new_a)
 {
   struct foo *new_fp;
   struct foo *old_fp;
 
-  new_fp = (struct foo *) malloc(sizeof(*new_fp));
+  new_fp = create_foo(new_a);
   lock_acquire(&lk);
   old_fp = global_foo;
-  new_fp->a = new_a;
-  new_fp->freed = 0;
   global_foo = new_fp;
   lock_release(&lk);
   rcu_synchronize(&rm, rd);
-  old_fp->freed = 1;			/* old_fp is freed */
-  free(old_fp);
+  FREE_FOO(old_fp);             /* old_fp is freed */
   COUNT_WRITE(rd->id);			/* for sanity_failed check */
 }
 
 int foo_get_a(struct rcu_data *rd)
 {
-  int retval;
+  int retval = 0;
   struct foo *ptr;
   int i;
 
@@ -63,8 +80,7 @@ int foo_get_a(struct rcu_data *rd)
   for (i = 0; i < 100000; ++i)
 	retval++; /* waiting with doing a meaningless thing. */
 
-  if (ptr->freed) /* The error should be occurred when the stale global_foo got freed. */
-	__sync_add_and_fetch(&sanity_failed, 1);
+  SEGMENTATION_FAULT_CHECK(ptr); /* The error should be occurred when the stale global_foo got freed. */
 
   retval = ptr->a;
   rcu_reader_unlock(&rm, rd);
