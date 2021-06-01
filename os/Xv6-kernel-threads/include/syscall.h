@@ -28,11 +28,8 @@
 #define SYS_rcu_init   24
 #define SYS_rcu_reader_lock   25
 #define SYS_rcu_reader_unlock   26
-#define SYS_rcu_writer_lock   27
-#define SYS_rcu_writer_unlock   28
-#define SYS_rcu_synchronize   29
-#define SYS_rcu_register   30
-#define SYS_rcu_unregister   31
-#define SYS_rcu_free   32
+#define SYS_rcu_synchronize   27
+#define SYS_rcu_register   28
+#define SYS_rcu_unregister   29
 
 #endif // _SYSCALL_H_

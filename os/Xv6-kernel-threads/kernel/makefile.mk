@@ -30,7 +30,6 @@ KERNEL_OBJECTS := \
 	vectors.o\
 	vm.o\
 	krcu.o\
-	malloc.o\
 
 KERNEL_OBJECTS := $(addprefix kernel/, $(KERNEL_OBJECTS))
 

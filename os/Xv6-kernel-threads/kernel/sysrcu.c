@@ -74,48 +74,6 @@ sys_rcu_reader_unlock(void)
 }
 
 int
-sys_rcu_writer_lock(void)
-{
-  int tmp;
-  int lock_id;
-  struct rcu_maintain *rm;
-
-  if (argint(0, &tmp) < 0)
-	return -1;
-  
-  if (argint(1, &lock_id) < 0)
-	return -1;
-
-  rm = (struct rcu_maintain *)tmp;
-
-  /* call implement here! */
-  rcu_writer_lock(rm, lock_id);
-  /* just for debugging */
-  return 1;
-}
-
-int
-sys_rcu_writer_unlock(void)
-{
-  int tmp;
-  int lock_id;
-  struct rcu_maintain *rm;
-
-  if (argint(0, &tmp) < 0)
-	return -1;
-  
-  if (argint(1, &lock_id) < 0)
-	return -1;
-
-  rm = (struct rcu_maintain *)tmp;
-
-  /* call implement here! */
-  rcu_writer_unlock(rm, lock_id);
-  /* just for debugging */
-  return 1;
-}
-
-int
 sys_rcu_synchronize(void)
 {
   int tmp0, tmp1;
@@ -172,34 +130,6 @@ sys_rcu_unregister(void)
 
   /* call implement here! */
   rcu_unregister(d);
-  /* just for debugging */
-  return 1;
-}
-
-/* get int parameter as a casted pointer value. */
-int
-sys_rcu_free(void)
-{
-  int tmp0, tmp1, tmp2;
-  struct rcu_maintain *rm;
-  struct rcu_data *d;
-  void *ptr;
-
-  if (argint(0, &tmp0) < 0)
-	return -1;
-  
-  if (argint(1, &tmp1) < 0)
-	return -1;
-
-  if (argint(2, &tmp2) < 0)
-	return -1;
-
-  rm = (struct rcu_maintain *)tmp0;
-  d = (struct rcu_data *)tmp1;
-  ptr = (void *)tmp2;
-
-  /* call implement here! */
-  rcu_free(rm, d, ptr);
   /* just for debugging */
   return 1;
 }

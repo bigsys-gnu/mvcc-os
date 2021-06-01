@@ -56,12 +56,9 @@ void lock_release(lock_t *lk);
 int rcu_init(struct rcu_maintain *rm, int num_threads);
 int rcu_reader_lock(struct rcu_maintain *rm, struct rcu_data *d);
 int rcu_reader_unlock(struct rcu_maintain *rm, struct rcu_data *d);
-int rcu_writer_lock(struct rcu_maintain *rm, int lock_id);
-int rcu_writer_unlock(struct rcu_maintain *rm, int lock_id);
 int rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d);
 int rcu_register(struct rcu_maintain *rm, struct rcu_data *d);
 int rcu_unregister(struct rcu_data *d);
-int rcu_free(struct rcu_maintain *rm, struct rcu_data *d, void *ptr);
 
 #endif // _USER_H_
 

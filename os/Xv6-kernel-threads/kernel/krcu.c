@@ -53,10 +53,6 @@ void rcu_init(struct rcu_maintain *rm, int num_threads)
 
   /* rm->rcu_table =  result; */
 
-  /* need to be fixed. */
-  /* for (i = 0; i < MAX_SPIN_LOCKS; i++) */
-  /* 	initlock(&(rm->urcu_spin[i]), "rcu"); */
-
   return; 
 }
 
@@ -93,20 +89,6 @@ void rcu_reader_unlock(struct rcu_maintain *rm, struct rcu_data *d)
   set_bit(0, (unsigned long *)&rm->rcu_table[d->id].time);
 }
 
-/* need to be fixed */
-void rcu_writer_lock(struct rcu_maintain *rm, int lock_id)
-{
-  /* assert(lock_id < MAX_SPIN_LOCKS); */
-  /* acquire(&(rm->urcu_spin[lock_id])); */
-}
-
-/* need to be fixed */
-void rcu_writer_unlock(struct rcu_maintain *rm, int lock_id)
-{
-  /* assert(lock_id < MAX_SPIN_LOCKS); */
-  /* release(&(rm->urcu_spin[lock_id])); */
-}
-
 void rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d)
 {
   int i; 
@@ -125,21 +107,4 @@ void rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d)
 			}
 		}
 	}
-}
-
-void rcu_free(struct rcu_maintain *rm, struct rcu_data *d, void *ptr)
-{
-  /* int k; */
-	
-  /* rm->rcu_table[d->id]->free_ptrs[rm->rcu_table[d->id].f_size] = ptr; */
-  /* rm->rcu_table[d->id]->f_size++; */
-  /* if (rm->rcu_table[d->id]->f_size == RCU_MAX_FREE_PTRS) */
-  /* 	{ */
-  /* 	  rcu_synchronize(rm, d); */
-		
-  /* 	  for (k = 0; k < rm->rcu_table[d->id]->f_size; k++) */
-  /* 		free(rm->rcu_table[d->id]->free_ptrs[k]); */
-
-  /* 	  rm->rcu_table[d->id]->f_size = 0; */
-  /* 	} */
 }
