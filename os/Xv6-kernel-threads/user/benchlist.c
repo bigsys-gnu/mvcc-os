@@ -6,16 +6,18 @@
 #include "x86.h"
 #include "new-urcu.h"
 
-
 #undef NULL
 #define NULL ((void*)0)
 
 #define PGSIZE (4096)
 
-
-
-#define INSERT_TIME 8000
-#define DELETE_TIME 2000
+#define MAX_BUCKETS (2000)
+#define DEFAULT_BUCKETS                 1
+#define DEFAULT_DURATION                1000
+#define DEFAULT_UPDATE                  200
+#define DEFAULT_INITIAL                 64
+#define DEFAULT_NB_THREADS              1
+#define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
 
 typedef struct node {
     int value;
@@ -26,6 +28,21 @@ typedef struct spinlock_list {
     lock_t* lk;
     node_t *head;
 } spinlock_list_t;
+
+typedef struct hash_list {
+	int n_buckets;
+	spinlock_list_t *buckets[MAX_BUCKETS];  
+} hash_list_t;
+
+typedef struct thread_param {
+	int n_buckets;
+	int initial;
+	int nb_threads;
+    int update;
+    int variation;
+    int *stop;
+    hash_list_t *p_hash_list;
+} thread_param_t;
 
 int list_deletes()
 {
@@ -61,12 +78,13 @@ int randomrange(int lo, int hi)
   return random() % (range) + lo;
 }
 
-void list_insert(int key, spinlock_list_t *list)
+int list_insert(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    lock_acquire(list->lk);
+    // lock_acquire(list->lk);
+
     if(list->head == NULL)
     {
         new_node = (node_t*)malloc(sizeof(node_t));
@@ -98,18 +116,18 @@ void list_insert(int key, spinlock_list_t *list)
     else{
         printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
     }
-    lock_release(list->lk);
+    // lock_release(list->lk);
 
-    return;
+    return ret;
 }
 
-void list_delete(int key, spinlock_list_t *list)
+int list_delete(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret = 0;
-    lock_acquire(list->lk);
+    // lock_acquire(list->lk);
     if(list->head == NULL){
-        return;
+        return ret;
     }
     else{
         prev = list->head;
@@ -117,7 +135,6 @@ void list_delete(int key, spinlock_list_t *list)
         for(; cur!=NULL; prev=cur, cur=cur->next)
         {
             if(cur->value == key){
-                printf(1, "delete value : %d\n", cur->value);
                 ret = 1;
                 break;
             }
@@ -134,9 +151,9 @@ void list_delete(int key, spinlock_list_t *list)
     else{
         printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
     }
-    lock_release(list->lk);
-    return;
+    // lock_release(list->lk);
 
+    return ret;
 }
 
 int list_find(int key, spinlock_list_t *list)
@@ -144,63 +161,194 @@ int list_find(int key, spinlock_list_t *list)
     node_t *prev, *cur;
     int ret, val;
 
-    lock_acquire(list->lk);
+    // lock_acquire(list->lk);
     for(prev = list->head, cur = prev->next; cur!=NULL; prev = cur, cur = cur ->next){
         if((val= cur->value) >= key)
             break;
     ret = (val == key);
-    printf(1, "ret: %d\n", ret);
-    lock_release(list->lk);
+    // printf(1, "ret: %d\n", ret);
+    // lock_release(list->lk);
     }
-    exit();
+
+    return ret;
 }
 
-void test(void* ptr)
+void test(void* param)
 {
-    int i, value;
+    int op, bucket, value;
     value = 1;//sys_uptime();
-    int insert_time=0, delete_time=0;
-    for(i = 0; i<100; i++)
-    {
-        printf(1, "for i : %d\n", i);
 
+    thread_param_t *p_data = (thread_param_t*)param; 
+    hash_list_t *p_hash_list = p_data->p_hash_list;
+
+    while (*p_data->stop == 0)
+    {
+        op = randomrange(1, 1000);
         value = randomrange(1, 30);
-        if(i == 0 || i%2 == 0)
+        bucket = HASH_VALUE(p_hash_list, value);
+        spinlock_list_t *p_list = p_hash_list->buckets[bucket];
+
+        if (op < p_data->update)
         {
-            list_insert(value, (spinlock_list_t*)ptr);
-            insert_time++;
+            if ((op & 0x01) == 0)
+            {
+                if (list_insert(value, p_list))
+                {
+                    p_data->variation++;
+                }
+            }
+            else
+            {
+                if (list_delete(value, p_list))
+                {
+                    p_data->variation--;
+                }
+            }
         }
-        else{
-            list_delete(value, (spinlock_list_t*)ptr);
-            delete_time++;
+        else
+        {
+            list_find(value, p_list);
         }
-        value++;
     }
+
     printf(1, "thread %d end\n", getpid());
     exit();
 }
 
-int main()
+int main(int argc, char **argv)
 {
-    spinlock_list_t* list = (spinlock_list_t*)malloc(sizeof(spinlock_list_t));
-    list->head = NULL;
-    printf(1, "bench_list main\n");
-    lock_init(list->lk);
+    thread_param_t *param_list;
+    hash_list_t *p_hash_list;
+    int *thread_list;
+    int stop = 0, initial_time = 0;
+    int total_variation = 0, total_size = 0, initialized = 0;
 
-    int thread_pid1 = thread_create(&test, (void*)list);
-    int thread_pid2 = thread_create(&test, (void*)list);
-    printf(1, "pid1 = %d\n", thread_pid1);
-    printf(1, "pid2 = %d\n", thread_pid2);
-    assert(thread_pid1 > 0);
-    assert(thread_pid2 > 0);
+	int n_buckets = DEFAULT_BUCKETS;
+	int initial = DEFAULT_INITIAL;
+	int nb_threads = DEFAULT_NB_THREADS;
+	int duration = DEFAULT_DURATION;
+	int update = DEFAULT_UPDATE;
 
-    int join_pid1 = thread_join();
-    int join_pid2 = thread_join();
-    assert(join_pid1 == thread_pid1);
-    assert(join_pid2 == thread_pid2);
+    switch (argc - 1)
+    {
+    case 5:
+        update = atoi(argv[5]);
+    case 4:
+        duration = atoi(argv[4]);
+    case 3:
+        n_buckets = atoi(argv[3]);
+    case 2:
+        initial = atoi(argv[2]);
+    case 1:
+        nb_threads = atoi(argv[1]);
+    default:
+        printf(1, "%d Option is inserted\n", argc - 1);
+        break;
+    }
+    printf(1, "-Nb threads   : %d\n", nb_threads);
+    printf(1, "-Initial size : %d\n", initial);
+    printf(1, "-Buckets      : %d\n", n_buckets);
+    printf(1, "-Duration     : %d\n", duration);
+    printf(1, "-Update rate  : %d\n", update);
+    printf(1,"-Set type     : hash-list\n");
 
+	assert(n_buckets >= 1);
+	assert(duration >= 0);
+	assert(initial >= 0);
+	assert(nb_threads > 0);
+
+    p_hash_list = (hash_list_t *)malloc(sizeof(hash_list_t));
+    if (p_hash_list == NULL) {
+	    printf(1,"hash_list init error\n");
+	    exit();
+	}
+    p_hash_list->n_buckets = n_buckets;
+
+    for (int i = 0; i < p_hash_list->n_buckets; i++) {
+        spinlock_list_t *list = p_hash_list->buckets[i];
+        list = (spinlock_list_t *)malloc(sizeof(spinlock_list_t));
+        if (list == NULL) {
+            printf(1,"spinlock_list init error\n");
+            exit();
+        }
+        list->head = NULL;
+        lock_init(list->lk);
+    }
+
+    for (int j = 0; j < initial; j++)
+    {
+        int value = randomrange(1, 30);
+        int bucket = HASH_VALUE(p_hash_list, value);
+        // printf(1, "init val=%d, buck=%d\n", value, bucket);
+        if(list_insert(value, p_hash_list->buckets[bucket]))
+        {
+            initialized++;
+        }
+    }
+
+    thread_list = (int *)malloc(nb_threads*sizeof(int));
+    if (thread_list == NULL) {
+        printf(1,"thread_list init error\n");
+        exit();
+    }
+
+    param_list = (thread_param_t *)malloc(nb_threads*sizeof(thread_param_t));
+    if (param_list == NULL) {
+        printf(1,"param_list init error\n");
+        exit();
+    }
+   
+    initial_time = uptime();
+    printf(1,"Creating %d threads...", nb_threads);
+    for(int i = 0; i < nb_threads; i++)
+    {
+        param_list[i].n_buckets = n_buckets;
+        param_list[i].initial = initial;
+        param_list[i].nb_threads = nb_threads;
+        param_list[i].update = update;
+        param_list[i].stop = &stop;
+        param_list[i].variation = 0;
+        param_list[i].p_hash_list = p_hash_list;
+
+        thread_list[i] = thread_create(&test, (void*)&param_list[i]);
+    }
+    printf(1," done!\n");
+
+    while(1)
+    {
+        if(uptime() - initial_time > duration)
+        {
+            printf(1, "elapsed time: %dms\n", uptime() - initial_time);
+            stop = 1;
+            break;
+        }
+    }
+    
+    for(int i = 0; i < nb_threads; i++)
+    {
+        thread_join();
+    }
+
+    for(int i = 0; i < nb_threads; i++)
+    {
+        total_variation += param_list[i].variation;
+    }
+
+    total_size = 0;
+    for(int i = 0; i < n_buckets; i++)
+    {
+        node_t *node = p_hash_list->buckets[i]->head;
+        while(node != NULL)
+        {
+            node = node->next;
+            total_size++;
+        }
+    }
+    int exp = initialized + total_variation;
+    if(exp != total_size)
+    {
+		printf(1,"\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", exp, total_size);
+    }
     printf(1, "bench_list end\n");
-
-
     exit();
 }
