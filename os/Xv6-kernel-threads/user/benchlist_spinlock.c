@@ -85,7 +85,7 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    // lock_acquire(list->lk);
+    lock_acquire(&list->lk);
 
     if(list->head == NULL)
     {
@@ -118,7 +118,7 @@ int list_insert(int key, spinlock_list_t *list)
     else{
         // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
     }
-    // lock_release(list->lk);
+    lock_release(&list->lk);
 
     return ret;
 }
@@ -127,7 +127,7 @@ int list_delete(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret = 0;
-    // lock_acquire(list->lk);
+    lock_acquire(&list->lk);
     if(list->head == NULL){
         return ret;
     }
@@ -153,7 +153,7 @@ int list_delete(int key, spinlock_list_t *list)
     else{
         // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
     }
-    // lock_release(list->lk);
+    lock_release(&list->lk);
 
     return ret;
 }
@@ -163,14 +163,14 @@ int list_find(int key, spinlock_list_t *list)
     node_t *prev, *cur;
     int ret, val;
 
-    // lock_acquire(list->lk);
-    for(prev = list->head, cur = prev->next; cur!=NULL; prev = cur, cur = cur ->next){
-        if((val= cur->value) >= key)
+    lock_acquire(&list->lk);
+    for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
+    {
+        if ((val = cur->value) >= key)
             break;
-    ret = (val == key);
-    // printf(1, "ret: %d\n", ret);
-    // lock_release(list->lk);
+        ret = (val == key);
     }
+    lock_release(&list->lk);
 
     return ret;
 }
@@ -189,7 +189,6 @@ void test(void* param)
         value = randomrange(1, p_data->range);
         bucket = HASH_VALUE(p_hash_list, value);
         spinlock_list_t *p_list = p_hash_list->buckets[bucket];
-
         if (op < p_data->update)
         {
             if ((op & 0x01) == 0)

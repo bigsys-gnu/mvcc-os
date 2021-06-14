@@ -13,20 +13,22 @@ USER_PROGS := \
 	rm\
 	sh\
 	malloc\
-	size-test\
-	join2-test\
-	join3-test\
-	thread-test\
-	thread2-test\
 	stressfs\
 	tester\
 	usertests\
 	wc\
-	stack-test\
-	test_fork\
 	basic_thread\
-	clone3-test\
 	benchlist\
+	benchlist_spinlock\
+	benchlist_rcu\
+	# size-test\
+	# join2-test\
+	# join3-test\
+	# thread-test\
+	# thread2-test\
+	# clone3-test\
+	# stack-test\
+	# test_fork\
 	# zombie\
 	# list_rcu\
 	# asdf\

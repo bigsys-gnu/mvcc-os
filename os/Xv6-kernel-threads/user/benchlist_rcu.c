@@ -26,7 +26,8 @@ typedef struct node {
 } node_t;
 
 typedef struct spinlock_list {
-    lock_t lk;
+    int bucket_id;
+    // lock_t lk;
     node_t *head;
 } spinlock_list_t;
 
@@ -39,6 +40,7 @@ typedef struct thread_param {
 	int n_buckets;
 	int initial;
 	int nb_threads;
+    int tidx;
     int update;
     int range;
     int variation;
@@ -85,7 +87,7 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    // lock_acquire(list->lk);
+    urcu_writer_lock(list->bucket_id);
 
     if(list->head == NULL)
     {
@@ -118,7 +120,7 @@ int list_insert(int key, spinlock_list_t *list)
     else{
         // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
     }
-    // lock_release(list->lk);
+    urcu_writer_unlock(list->bucket_id);
 
     return ret;
 }
@@ -127,7 +129,7 @@ int list_delete(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret = 0;
-    // lock_acquire(list->lk);
+    urcu_writer_lock(list->bucket_id);
     if(list->head == NULL){
         return ret;
     }
@@ -153,24 +155,25 @@ int list_delete(int key, spinlock_list_t *list)
     else{
         // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
     }
-    // lock_release(list->lk);
+    urcu_writer_unlock(list->bucket_id);
 
     return ret;
 }
 
-int list_find(int key, spinlock_list_t *list)
+int list_find(int key, spinlock_list_t *list, int tidx)
 {
     node_t *prev, *cur;
     int ret, val;
 
-    // lock_acquire(list->lk);
-    for(prev = list->head, cur = prev->next; cur!=NULL; prev = cur, cur = cur ->next){
-        if((val= cur->value) >= key)
+    urcu_reader_lock(tidx);
+    for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
+    {
+        if ((val = cur->value) >= key)
             break;
-    ret = (val == key);
-    // printf(1, "ret: %d\n", ret);
-    // lock_release(list->lk);
+        ret = (val == key);
+        // printf(1, "ret: %d\n", ret);
     }
+    urcu_reader_unlock(tidx);
 
     return ret;
 }
@@ -182,6 +185,8 @@ void test(void* param)
 
     thread_param_t *p_data = (thread_param_t*)param; 
     hash_list_t *p_hash_list = p_data->p_hash_list;
+
+    urcu_register(p_data->tidx);
 
     while (*p_data->stop == 0)
     {
@@ -209,11 +214,12 @@ void test(void* param)
         }
         else
         {
-            list_find(value, p_list);
+            list_find(value, p_list, p_data->tidx);
         }
         sleep(1);
     }
 
+    urcu_unregister(p_data->tidx);
     printf(1, "thread %d end\n", getpid());
     exit();
 }
@@ -281,7 +287,7 @@ int main(int argc, char **argv)
             exit();
         }
         list->head = NULL;
-        lock_init(&list->lk);
+        list->bucket_id = i;
         p_hash_list->buckets[i] = list;
     }
 
@@ -304,6 +310,7 @@ int main(int argc, char **argv)
         printf(1,"thread_list init error\n");
         exit();
     }
+    urcu_init(nb_threads);
 
     param_list = (thread_param_t *)malloc(nb_threads*sizeof(thread_param_t));
     if (param_list == NULL) {
@@ -318,6 +325,7 @@ int main(int argc, char **argv)
         param_list[i].n_buckets = n_buckets;
         param_list[i].initial = initial;
         param_list[i].nb_threads = nb_threads;
+        param_list[i].tidx = i;
         param_list[i].update = update;
         param_list[i].range = range;
         param_list[i].stop = &stop;

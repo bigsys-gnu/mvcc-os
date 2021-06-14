@@ -44,6 +44,7 @@ int ppid;
 
 
 lock_t urcu_spin[MAX_SPIN_LOCKS];
+long** times = NULL; 
 
 void urcu_init(int num_threads){
     
@@ -63,41 +64,37 @@ void urcu_init(int num_threads){
 
 	for (i = 0; i < MAX_SPIN_LOCKS; i++) {
 		lock_init(&(urcu_spin[i]));
-	}	
+	}
+
+    times = (long**)malloc(sizeof(long*)*threads);
 
     printf(1, "initializing URCU finished, node_size: %d\n", sizeof(rcu_node));
     return; 
 }
 
-__thread long* times = NULL; 
-__thread int i; 
-
-void urcu_register(int id){
-    printf(1, "test");
-    times = (long*) malloc(sizeof(long)*threads);
-    i = id; 
-    if (times == NULL ){
+void urcu_register(int tidx){
+    times[tidx] = (long*) malloc(sizeof(long)*threads);
+    if (times[tidx] == NULL){
         printf(1, "malloc failed\n");
         exit();
     }
 }
-void urcu_unregister(){
-    free(times);
+void urcu_unregister(int tidx){
+    free(times[tidx]);
 }
 
-void urcu_reader_lock(){
-    assert(urcu_table[i] != NULL);
-    __sync_add_and_fetch(&urcu_table[i]->time, 1);
+void urcu_reader_lock(int tidx){
+    assert(urcu_table[tidx] != NULL);
+    __sync_add_and_fetch(&urcu_table[tidx]->time, 1);
 }
-
 
 static inline void set_bit(int nr, volatile unsigned long *addr){
     asm("btsl %1,%0" : "+m" (*addr) : "Ir" (nr));
 }
 
-void urcu_reader_unlock(){
-    assert(urcu_table[i]!= NULL);
-    set_bit(0, (unsigned long *)&urcu_table[i]->time);
+void urcu_reader_unlock(int tidx){
+    assert(urcu_table[tidx]!= NULL);
+    set_bit(0, (unsigned long *)&urcu_table[tidx]->time);
 }
 
 void urcu_writer_lock(int lock_id){
@@ -108,37 +105,37 @@ void urcu_writer_unlock(int lock_id){
 	lock_release(&(urcu_spin[lock_id]));
 }
 
-void urcu_synchronize(){
+void urcu_synchronize(int tidx){
     int i; 
     //read old counters
     for( i=0; i<threads ; i++){
-        times[i] = urcu_table[i]->time;
+        times[tidx][i] = urcu_table[i]->time;
     }
     for( i=0; i<threads ; i++){
-        if (times[i] & 1) continue;
+        if (times[tidx][i] & 1) continue;
         while(1){
             unsigned long t = urcu_table[i]->time;
-            if (t & 1 || t > times[i]){
+            if (t & 1 || t > times[tidx][i]){
                 break; 
             }
         }
     }
 }
 
-void urcu_free(void *ptr) {
+void urcu_free(int tidx, void *ptr) {
 	int k;
 	
-	urcu_table[i]->free_ptrs[urcu_table[i]->f_size] = ptr;
-	urcu_table[i]->f_size++;
+	urcu_table[tidx]->free_ptrs[urcu_table[tidx]->f_size] = ptr;
+	urcu_table[tidx]->f_size++;
 	
-	if (urcu_table[i]->f_size == URCU_MAX_FREE_PTRS) {
+	if (urcu_table[tidx]->f_size == URCU_MAX_FREE_PTRS) {
 		
-		urcu_synchronize();
+		urcu_synchronize(tidx);
 		
-		for (k = 0; k < urcu_table[i]->f_size; k++) {
-			free(urcu_table[i]->free_ptrs[k]);
+		for (k = 0; k < urcu_table[tidx]->f_size; k++) {
+			free(urcu_table[tidx]->free_ptrs[k]);
 		}
 		
-		urcu_table[i]->f_size = 0;
+		urcu_table[tidx]->f_size = 0;
 	}
 }

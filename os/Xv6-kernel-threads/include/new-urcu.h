@@ -44,14 +44,14 @@ int ppid;
 }
 
 void urcu_init(int num_threads);
-void urcu_reader_lock();
-void urcu_reader_unlock();
+void urcu_reader_lock(int tidx);
+void urcu_reader_unlock(int tidx);
 void urcu_writer_lock(int lock_id);
 void urcu_writer_unlock(int lock_id);
-void urcu_synchronize(); 
-void urcu_register(int id);
-void urcu_unregister();
-void urcu_free(void *ptr);
+void urcu_synchronize(int tidx); 
+void urcu_register(int tidx);
+void urcu_unregister(int tidx);
+void urcu_free(int tidx, void *ptr);
 
 #else
 
