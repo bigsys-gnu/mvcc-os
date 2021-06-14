@@ -13,20 +13,25 @@ USER_PROGS := \
 	rm\
 	sh\
 	malloc\
-	size-test\
-	join2-test\
-	join3-test\
-	thread-test\
-	thread2-test\
 	stressfs\
 	tester\
 	usertests\
 	wc\
-	stack-test\
-	test_fork\
 	basic_thread\
-	clone3-test\
-	zombie
+	benchlist\
+	benchlist_spinlock\
+	benchlist_rcu\
+	# size-test\
+	# join2-test\
+	# join3-test\
+	# thread-test\
+	# thread2-test\
+	# clone3-test\
+	# stack-test\
+	# test_fork\
+	# zombie\
+	# list_rcu\
+	# asdf\
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -35,7 +40,8 @@ USER_LIBS := \
 	umalloc.o\
 	ulib.o\
 	usys.o\
-	printf.o
+	printf.o\
+	new-urcu.o\
 	
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
