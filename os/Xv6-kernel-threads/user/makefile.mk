@@ -2,31 +2,19 @@
 # user programs
 USER_PROGS := \
 	cat\
-	echo\
-	forktest\
-	grep\
 	init\
-	kill\
-	ln\
 	ls\
-	mkdir\
-	rm\
 	sh\
-	malloc\
 	size-test\
 	join2-test\
 	join3-test\
 	thread-test\
 	thread2-test\
-	stressfs\
 	tester\
 	usertests\
 	wc\
-	stack-test\
-	test_fork\
 	basic_thread\
-	clone3-test\
-	zombie
+	clone3-test
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -35,8 +23,8 @@ USER_LIBS := \
 	umalloc.o\
 	ulib.o\
 	usys.o\
-	printf.o
-	
+	printf.o\
+	rlu.o
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
 

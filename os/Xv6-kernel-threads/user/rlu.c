@@ -8,7 +8,6 @@
 // INCLUDES
 /////////////////////////////////////////////////////////////////////////////////////////
 
-# include <time.h>
 # define likely(x) __builtin_expect ((x), 1)
 # define unlikely(x) __builtin_expect ((x), 0)
 
@@ -59,8 +58,10 @@
 #define GET_ACTUAL(p_obj_copy) (PTR_GET_WS_HEADER(p_obj_copy)->p_obj_actual)
 #define FORCE_ACTUAL(p_obj) (IS_COPY(p_obj) ? GET_ACTUAL(p_obj) : p_obj)
 
-#define TRY_CAS_PTR_OBJ_COPY(p_obj, new_ptr_obj_copy) (CAS((volatile int64_t *)&(OBJ_TO_H(p_obj)->p_obj_copy), 0, (int64_t)new_ptr_obj_copy) == 0)
+#define TRY_CAS_PTR_OBJ_COPY(p_obj, new_ptr_obj_copy) (CAS((volatile int *)&(OBJ_TO_H(p_obj)->p_obj_copy), 0, (int)new_ptr_obj_copy) == 0)
 #define UNLOCK(p_obj) OBJ_TO_H(p_obj)->p_obj_copy = NULL
+
+#define RLU_CACHE_LINE_SIZE (32)
 
 #ifdef __x86_64
 # define RLU_CACHE_LINE_SIZE (64)
@@ -497,8 +498,8 @@ static long rlu_wait_for_quiescence(rlu_thread_data_t *self, unsigned long versi
 
 			if (iters > Q_ITERS_LIMIT) {
 				iters = 0;
-				printf("[%ld] waiting for [%d] with: local_version = %ld , run_cnt = %ld\n", self->uniq_id, th_id,
-					g_rlu_threads[th_id]->local_version, g_rlu_threads[th_id]->run_counter);
+				printf(1, "[%d] waiting for [%d] with: local_version = %d , run_cnt = %d\n", self->uniq_id, th_id,
+					   g_rlu_threads[th_id]->local_version, g_rlu_threads[th_id]->run_counter);
 			}
 
 			CPU_RELAX();
@@ -511,14 +512,13 @@ static long rlu_wait_for_quiescence(rlu_thread_data_t *self, unsigned long versi
 }
 
 static void rlu_synchronize(rlu_thread_data_t *self) {
-	long q_iters;
 
 	if (self->is_no_quiescence) {
 		return;
 	}
 
 	rlu_init_quiescence(self);
-	q_iters = rlu_wait_for_quiescence(self, self->writer_version);
+	rlu_wait_for_quiescence(self, self->writer_version);
 }
 
 static void rlu_sync_and_writeback(rlu_thread_data_t *self) {
@@ -599,11 +599,11 @@ void rlu_init_args(int type, int ws) {
 	if (type == RLU_TYPE_COARSE_GRAINED) {
 		g_rlu_type = RLU_TYPE_COARSE_GRAINED;
 		g_rlu_max_write_sets = 1;
-		printf("RLU - COARSE_GRAINED initialized\n");
+		printf(1, "RLU - COARSE_GRAINED initialized\n");
 	} else if (type == RLU_TYPE_FINE_GRAINED) {
 		g_rlu_type = RLU_TYPE_FINE_GRAINED;
 		g_rlu_max_write_sets = ws;
-		printf("RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
+		printf(1, "RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
 	} else {
 		RLU_TRACE_GLOBAL("unknown type [%d]", RLU_TYPE);
 		exit();
@@ -622,11 +622,11 @@ void rlu_init(void) {
 	if (RLU_TYPE == RLU_TYPE_COARSE_GRAINED) {
 		g_rlu_type = RLU_TYPE_COARSE_GRAINED;
 		g_rlu_max_write_sets = 1;
-		printf("RLU - COARSE_GRAINED initialized\n");
+		printf(1, "RLU - COARSE_GRAINED initialized\n");
 	} else if (RLU_TYPE == RLU_TYPE_FINE_GRAINED) {
 		g_rlu_type = RLU_TYPE_FINE_GRAINED;
 		g_rlu_max_write_sets = RLU_NUM_WS;
-		printf("RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
+		printf(1, "RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
 	} else {
 		RLU_TRACE_GLOBAL("unknown type [%d]", RLU_TYPE);
 		abort();
