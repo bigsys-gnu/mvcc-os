@@ -29,17 +29,17 @@
 #define PERFORM_ALIGNMENT(obj_size) (obj_size + (ALIGN_NUMBER - (obj_size & ALIGN_MASK)))
 #define ALIGN_OBJ_SIZE(obj_size) ((obj_size & ALIGN_MASK) ? PERFORM_ALIGNMENT(obj_size) : obj_size)
 
-#define MOVE_PTR_FORWARD(p_obj, offset) ((intptr_t *)(((volatile unsigned char *)p_obj) + offset))
-#define MOVE_PTR_BACK(p_obj, offset) ((intptr_t *)(((volatile unsigned char *)p_obj) - offset))
+#define MOVE_PTR_FORWARD(p_obj, offset) ((void *)(((volatile unsigned char *)p_obj) + offset))
+#define MOVE_PTR_BACK(p_obj, offset) ((void *)(((volatile unsigned char *)p_obj) - offset))
 
 #define OBJ_HEADER_SIZE (sizeof(rlu_obj_header_t))
 #define WS_OBJ_HEADER_SIZE (sizeof(rlu_ws_obj_header_t))
 
 #define OBJ_TO_H(p_obj) ((volatile rlu_obj_header_t *)MOVE_PTR_BACK(p_obj, OBJ_HEADER_SIZE))
-#define H_TO_OBJ(p_h_obj) ((volatile intptr_t *)MOVE_PTR_FORWARD(p_h_obj, OBJ_HEADER_SIZE))
+#define H_TO_OBJ(p_h_obj) ((volatile void *)MOVE_PTR_FORWARD(p_h_obj, OBJ_HEADER_SIZE))
 #define OBJ_COPY_TO_WS_H(p_obj_copy) ((volatile rlu_ws_obj_header_t *)MOVE_PTR_BACK(p_obj_copy, (OBJ_HEADER_SIZE+WS_OBJ_HEADER_SIZE)))
 
-#define PTR_ID_OBJ_COPY ((intptr_t *)0x12341234)
+#define PTR_ID_OBJ_COPY ((void *)0x12341234)
 
 #define GET_COPY(p_obj) (OBJ_TO_H(p_obj)->p_obj_copy)
 
@@ -230,17 +230,17 @@ static void rlu_reset_write_set(rlu_thread_data_t *self, long ws_counter) {
 	long ws_id = WS_INDEX(ws_counter);
 
 	self->obj_write_set[ws_id].num_of_objs = 0;
-	self->obj_write_set[ws_id].p_cur = (intptr_t *)&(self->obj_write_set[ws_id].buffer[0]);
+	self->obj_write_set[ws_id].p_cur = (void *)&(self->obj_write_set[ws_id].buffer[0]);
 	
 	rlu_reset_writer_locks(self, ws_id);
 }
 
-static intptr_t *rlu_add_ws_obj_header_to_write_set(rlu_thread_data_t *self, intptr_t *p_obj, obj_size_t obj_size) {
-	intptr_t *p_cur;
+static void *rlu_add_ws_obj_header_to_write_set(rlu_thread_data_t *self, void *p_obj, obj_size_t obj_size) {
+	void *p_cur;
 	rlu_ws_obj_header_t *p_ws_obj_h;
 	rlu_obj_header_t *p_obj_h;
 
-	p_cur = (intptr_t *)self->obj_write_set[self->ws_cur_id].p_cur;
+	p_cur = (void *)self->obj_write_set[self->ws_cur_id].p_cur;
 
 	p_ws_obj_h = (rlu_ws_obj_header_t *)p_cur;
 
@@ -262,11 +262,11 @@ static intptr_t *rlu_add_ws_obj_header_to_write_set(rlu_thread_data_t *self, int
 
 }
 
-static void rlu_add_obj_copy_to_write_set(rlu_thread_data_t *self, intptr_t *p_obj, obj_size_t obj_size) {
-	intptr_t *p_cur;
+static void rlu_add_obj_copy_to_write_set(rlu_thread_data_t *self, void *p_obj, obj_size_t obj_size) {
+	void *p_cur;
 	long cur_ws_size;
 
-	p_cur = (intptr_t *)self->obj_write_set[self->ws_cur_id].p_cur;
+	p_cur = (void *)self->obj_write_set[self->ws_cur_id].p_cur;
 
 	memcpy((unsigned char *)p_cur, (unsigned char *)p_obj, obj_size);
 
@@ -283,21 +283,21 @@ static void rlu_writeback_write_set(rlu_thread_data_t *self, long ws_counter) {
 	unsigned int i;
 	long ws_id;
 	obj_size_t obj_size;
-	intptr_t *p_cur;
-	intptr_t *p_obj_copy;
-	intptr_t *p_obj_actual;
+	void *p_cur;
+	void *p_obj_copy;
+	void *p_obj_actual;
 	rlu_ws_obj_header_t *p_ws_obj_h;
 	rlu_obj_header_t *p_obj_h;
 
 	ws_id = WS_INDEX(ws_counter);
 
-	p_cur = (intptr_t *)&(self->obj_write_set[ws_id].buffer[0]);
+	p_cur = (void *)&(self->obj_write_set[ws_id].buffer[0]);
 
 	for (i = 0; i < self->obj_write_set[ws_id].num_of_objs; i++) {
 
 		p_ws_obj_h = (rlu_ws_obj_header_t *)p_cur;
 
-		p_obj_actual = (intptr_t *)p_ws_obj_h->p_obj_actual;
+		p_obj_actual = (void *)p_ws_obj_h->p_obj_actual;
 		obj_size = (obj_size_t)p_ws_obj_h->obj_size;
 
 		p_cur = MOVE_PTR_FORWARD(p_cur, WS_OBJ_HEADER_SIZE);
@@ -307,7 +307,7 @@ static void rlu_writeback_write_set(rlu_thread_data_t *self, long ws_counter) {
 
 		p_cur = MOVE_PTR_FORWARD(p_cur, OBJ_HEADER_SIZE);
 
-		p_obj_copy = (intptr_t *)p_cur;
+		p_obj_copy = (void *)p_cur;
 
 		TRACE_2(self, "[%ld] rlu_writeback_and_unlock: copy [%p] <- [%p] [%zu]\n",
 			self->writer_version, p_obj_actual, p_obj_copy, obj_size);
@@ -359,20 +359,20 @@ static void rlu_unlock_objs(rlu_thread_data_t *self, int ws_counter) {
 	unsigned int i;
 	long ws_id;
 	obj_size_t obj_size;
-	intptr_t *p_cur;
-	intptr_t *p_obj_actual;
+	void *p_cur;
+	void *p_obj_actual;
 	rlu_ws_obj_header_t *p_ws_obj_h;
 	rlu_obj_header_t *p_obj_h;
 
 	ws_id = WS_INDEX(ws_counter);
 
-	p_cur = (intptr_t *)&(self->obj_write_set[ws_id].buffer[0]);
+	p_cur = (void *)&(self->obj_write_set[ws_id].buffer[0]);
 
 	for (i = 0; i < self->obj_write_set[ws_id].num_of_objs; i++) {
 
 		p_ws_obj_h = (rlu_ws_obj_header_t *)p_cur;
 
-		p_obj_actual = (intptr_t *)p_ws_obj_h->p_obj_actual;
+		p_obj_actual = (void *)p_ws_obj_h->p_obj_actual;
 		obj_size = p_ws_obj_h->obj_size;
 
 		p_cur = MOVE_PTR_FORWARD(p_cur, WS_OBJ_HEADER_SIZE);
@@ -419,7 +419,7 @@ static void rlu_unregister_thread(rlu_thread_data_t *self) {
 /////////////////////////////////////////////////////////////////////////////////////////
 static void rlu_process_free(rlu_thread_data_t *self) {
 	int i;
-	intptr_t *p_obj;
+	void *p_obj;
 
 	TRACE_3(self, "start free process free_nodes_size = %ld.\n", self->free_nodes_size);
 
@@ -431,9 +431,9 @@ static void rlu_process_free(rlu_thread_data_t *self) {
 			p_obj, GET_THREAD_ID(p_obj));
 
 		TRACE_3(self, "freeing: p_obj = %p, p_actual = %p\n",
-			p_obj, (intptr_t *)OBJ_TO_H(p_obj));
+			p_obj, (void *)OBJ_TO_H(p_obj));
 
-		free((intptr_t *)OBJ_TO_H(p_obj));
+		free((void *)OBJ_TO_H(p_obj));
 	}
 
 	self->free_nodes_size = 0;
@@ -662,11 +662,11 @@ void rlu_thread_init(rlu_thread_data_t *self) {
 
 }
 
-intptr_t *rlu_alloc(obj_size_t obj_size) {
-	intptr_t *ptr;
+void *rlu_alloc(obj_size_t obj_size) {
+	void *ptr;
 	rlu_obj_header_t *p_obj_h;
 
-	ptr = (intptr_t *)malloc(OBJ_HEADER_SIZE + obj_size);
+	ptr = (void *)malloc(OBJ_HEADER_SIZE + obj_size);
 	if (ptr == NULL) {
 		return NULL;
 	}
@@ -674,24 +674,24 @@ intptr_t *rlu_alloc(obj_size_t obj_size) {
 	p_obj_h->p_obj_copy = NULL;
 
 	TRACE_3_GLOBAL("ptr=%p full_size=%zu ptr_to_obj=%p\n",
-		ptr, (OBJ_HEADER_SIZE + obj_size), (intptr_t *)H_TO_OBJ(p_obj_h));
+		ptr, (OBJ_HEADER_SIZE + obj_size), (void *)H_TO_OBJ(p_obj_h));
 
-	return (intptr_t *)H_TO_OBJ(p_obj_h);
+	return (void *)H_TO_OBJ(p_obj_h);
 }
 
-void rlu_free(rlu_thread_data_t *self, intptr_t *p_obj) {
+void rlu_free(rlu_thread_data_t *self, void *p_obj) {
 	if (p_obj == NULL) {
 		return;
 	}
 
 	if (self == NULL) {
-		free((intptr_t *)OBJ_TO_H(p_obj));
+		free((void *)OBJ_TO_H(p_obj));
 		return;
 	}
 	
 	rlu_assert_in_section(self);
 	
-	p_obj = (intptr_t *)FORCE_ACTUAL(p_obj);
+	p_obj = (void *)FORCE_ACTUAL(p_obj);
 
 	self->free_nodes[self->free_nodes_size] = p_obj;
 	self->free_nodes_size++;
@@ -759,16 +759,16 @@ void rlu_reader_unlock(rlu_thread_data_t *self) {
 
 }
 
-intptr_t *rlu_deref_slow_path(rlu_thread_data_t *self, intptr_t *p_obj) {
+void *rlu_deref_slow_path(rlu_thread_data_t *self, void *p_obj) {
 	long th_id;
-	intptr_t *p_obj_copy;
+	void *p_obj_copy;
 	volatile rlu_ws_obj_header_t *p_ws_obj_h;
 
 	if (p_obj == NULL) {
 		return p_obj;
 	}
 
-	p_obj_copy = (intptr_t *)GET_COPY(p_obj);
+	p_obj_copy = (void *)GET_COPY(p_obj);
 
 	if (!PTR_IS_LOCKED(p_obj_copy)) {
 		return p_obj;
@@ -806,9 +806,9 @@ intptr_t *rlu_deref_slow_path(rlu_thread_data_t *self, intptr_t *p_obj) {
 	return p_obj;
 }
 
-int rlu_try_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, size_t obj_size) {
-	intptr_t *p_obj;
-	intptr_t *p_obj_copy;
+int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
+	void *p_obj;
+	void *p_obj_copy;
 	volatile long th_id;
 	volatile rlu_ws_obj_header_t *p_ws_obj_h;
 
@@ -817,14 +817,14 @@ int rlu_try_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, size_t obj_size) {
 	RLU_ASSERT_MSG(p_obj != NULL, self, "[%ld] rlu_try_lock: tried to lock a NULL pointer\n",
 		       self->writer_version);
 
-	p_obj_copy = (intptr_t *)GET_COPY(p_obj);
+	p_obj_copy = (void *)GET_COPY(p_obj);
 
 	if (PTR_IS_COPY(p_obj_copy)) {
 		TRACE_1(self, "tried to lock a copy of an object. p_obj = %p\n", p_obj);
 		TRACE_1(self, " => converting \n => copy: %p\n", p_obj);
 
-		p_obj = (intptr_t *)GET_ACTUAL(p_obj);
-		p_obj_copy = (intptr_t *)GET_COPY(p_obj);
+		p_obj = (void *)GET_ACTUAL(p_obj);
+		p_obj_copy = (void *)GET_COPY(p_obj);
 
 		TRACE_1(self, " => real: %p , p_obj_copy = %p\n", p_obj, p_obj_copy);
 	}
@@ -895,7 +895,7 @@ int rlu_try_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, size_t obj_size) {
 	return 1;
 }
 
-void rlu_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, unsigned int obj_size) {
+void rlu_lock(rlu_thread_data_t *self, void **p_p_obj, unsigned int obj_size) {
 	RLU_ASSERT(self->type == RLU_TYPE_COARSE_GRAINED);
 	
 	RLU_ASSERT(rlu_try_lock(self, p_p_obj, obj_size) != 0);
@@ -919,21 +919,21 @@ void rlu_abort(rlu_thread_data_t *self) {
 	rlu_sync_checkpoint(self);
 }
 
-int rlu_cmp_ptrs(intptr_t *p_obj_1, intptr_t *p_obj_2) {
+int rlu_cmp_ptrs(void *p_obj_1, void *p_obj_2) {
 	if (p_obj_1 != NULL) {
-		p_obj_1 = (intptr_t *)FORCE_ACTUAL(p_obj_1);
+		p_obj_1 = (void *)FORCE_ACTUAL(p_obj_1);
 	}
 
 	if (p_obj_2 != NULL) {
-		p_obj_2 = (intptr_t *)FORCE_ACTUAL(p_obj_2);
+		p_obj_2 = (void *)FORCE_ACTUAL(p_obj_2);
 	}
 
 	return p_obj_1 == p_obj_2;
 }
 
-void rlu_assign_pointer(intptr_t **p_ptr, intptr_t *p_obj) {
+void rlu_assign_pointer(void **p_ptr, void *p_obj) {
 	if (p_obj != NULL) {
-		p_obj = (intptr_t *)FORCE_ACTUAL(p_obj);
+		p_obj = (void *)FORCE_ACTUAL(p_obj);
 	}
 
 	*p_ptr = p_obj;

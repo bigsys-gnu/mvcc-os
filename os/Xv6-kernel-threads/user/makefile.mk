@@ -6,15 +6,12 @@ USER_PROGS := \
 	ls\
 	sh\
 	size-test\
-	join2-test\
-	join3-test\
-	thread-test\
-	thread2-test\
 	tester\
 	usertests\
 	wc\
 	basic_thread\
-	clone3-test
+	clone3-test\
+	rlu_test
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -55,6 +52,9 @@ USER_CFLAGS += -fno-stack-protector
 
 # generate code for 32-bit environment
 USER_CFLAGS += -m32
+
+#for rlu
+USER_CFLAGS += -mrtm
 
 # generate code for 32-bit environment
 USER_ASFLAGS := $(USER_CFLAGS)
@@ -101,4 +101,3 @@ user/%.d: user/%.c
 user/%.d: user/%.S
 	$(CC) $(CPPFLAGS) $(USER_CPPFLAGS) $(ASFLAGS) $(USER_ASFLAGS) \
 		-M -MG $< -MF $@ -MT $@ -MT $(<:.S=.o)
-
