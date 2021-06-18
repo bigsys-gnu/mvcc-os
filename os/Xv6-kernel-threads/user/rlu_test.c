@@ -1,7 +1,7 @@
 #include "rlu.h"
 #include "user.h"
 
-#define NUM_THREAD (10)
+#define NUM_THREAD (35)
 #define INIT_FOO(FOO_P, A)								\
   (FOO_P)->a = A;										\
   (FOO_P)->freed = 0
@@ -86,7 +86,7 @@ void worker(void *arg)
   rlu_thread_data_t self;
   RLU_THREAD_INIT(&self);
 
-  for (i = 0; i < 10; ++i)
+  for (i = 0; i < 100; ++i)
 	{
 	  printf(1, "[%d] a: %d\n", getpid(), foo_get_a(&self));
 	  if (i % 5 == 0)
@@ -111,6 +111,8 @@ int main(int argc, char *argv[])
 
   for (i = 0; i < NUM_THREAD; ++i)
 	thread_join();
+
+  printf(1, "the final a: %d\n", global_foo->a);
   
   exit();
 }

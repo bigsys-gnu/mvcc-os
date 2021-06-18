@@ -305,18 +305,11 @@ static int rlu_writeback_write_sets_and_unlock(rlu_thread_data_t *self) {
 
 	self->ws_head_counter = self->ws_wb_counter;
 
-#ifdef RLU_TIME_MEASUREMENT
-	self->t_begin = __read_tsc();
-#endif
 	ws_wb_num = 0;
 	for (ws_counter = self->ws_wb_counter; ws_counter < self->ws_tail_counter; ws_counter++) {
 		rlu_writeback_write_set(self, ws_counter);
 		ws_wb_num++;
 	}
-#ifdef RLU_TIME_MEASUREMENT
-	self->t_end = __read_tsc();
-	self->t_writeback_spent += self->t_end - self->t_begin; 
-#endif
 	self->ws_wb_counter = self->ws_tail_counter;
 
 	return ws_wb_num;

@@ -54,9 +54,6 @@ USER_CFLAGS += -fno-stack-protector
 # generate code for 32-bit environment
 USER_CFLAGS += -m32
 
-#for rlu
-USER_CFLAGS += -mrtm
-
 # generate code for 32-bit environment
 USER_ASFLAGS := $(USER_CFLAGS)
 

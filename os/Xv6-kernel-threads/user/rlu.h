@@ -23,8 +23,8 @@
 
 #define RLU_MAX_THREADS NPROC
 
-#define RLU_MAX_WRITE_SETS (200) // Minimum value is 2
-#define RLU_MAX_FREE_NODES (1000)
+#define RLU_MAX_WRITE_SETS (10) // Minimum value is 2
+#define RLU_MAX_FREE_NODES (100)
 
 #define RLU_MAX_WRITE_SET_BUFFER_SIZE (100)
 
