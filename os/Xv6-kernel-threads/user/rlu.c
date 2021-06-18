@@ -86,16 +86,6 @@
 /////////////////////////////////////////////////////////////////////////////////////////
 // DEFINES - ASSERT AND DEBUG
 /////////////////////////////////////////////////////////////////////////////////////////
-#define RLU_TRACE_GLOBAL(fmt, ...) \
-    printf(2, "%s:%d:%s(): " fmt, \
-            __FILE__, __LINE__, __func__, \
-            __VA_ARGS__);
-
-#define RLU_TRACE(self, fmt, ...) \
-    printf(2, "[%d][%d][%d]:%s:%d:%s(): " fmt, \
-            self->uniq_id, self->run_counter, self->local_version, \
-			__FILE__, __LINE__, __func__, \
-            __VA_ARGS__);
 
 #define RLU_ASSERT(cond) \
     if (unlikely(!(cond))) { \
@@ -108,27 +98,8 @@
     if (unlikely(!(cond))) { \
 	  printf (1, "\n-----------------------------------------------\n"); \
 	  printf (1, "\nAssertion failure: %s:%d '%s'\n", __FILE__, __LINE__, #cond); \
-	  RLU_TRACE(self, fmt, __VA_ARGS__);								\
 	  abort();															\
     }
-
-#ifdef RLU_ENABLE_TRACE_1
-#define TRACE_1(self, fmt, ...) RLU_TRACE(self, fmt, __VA_ARGS__)
-#else
-#define TRACE_1(self, fmt, ...)
-#endif
-#ifdef RLU_ENABLE_TRACE_2
-#define TRACE_2(self, fmt, ...) RLU_TRACE(self, fmt, __VA_ARGS__)
-#else
-#define TRACE_2(self, fmt, ...)
-#endif
-#ifdef RLU_ENABLE_TRACE_3
-#define TRACE_3(self, fmt, ...) RLU_TRACE(self, fmt, __VA_ARGS__)
-#define TRACE_3_GLOBAL(fmt, ...) RLU_TRACE_GLOBAL(fmt, __VA_ARGS__)
-#else
-#define TRACE_3(self, fmt, ...)
-#define TRACE_3_GLOBAL(fmt, ...)
-#endif
 
 #define Q_ITERS_LIMIT (100000000)
 
@@ -309,15 +280,12 @@ static void rlu_writeback_write_set(rlu_thread_data_t *self, long ws_counter) {
 
 		p_obj_copy = (void *)p_cur;
 
-		TRACE_2(self, "[%ld] rlu_writeback_and_unlock: copy [%p] <- [%p] [%zu]\n",
-			self->writer_version, p_obj_actual, p_obj_copy, obj_size);
-
 		memcpy((unsigned char *)p_obj_actual, (unsigned char *)p_obj_copy, obj_size);
 
 		p_cur = MOVE_PTR_FORWARD(p_cur, ALIGN_OBJ_SIZE(obj_size));
 
 		RLU_ASSERT_MSG(GET_THREAD_ID(p_obj_actual) == self->uniq_id,
-			self, "th_id = %ld my_id = %ld\n p_obj_actual = %p num_of_objs = %u\n",
+			self, "th_id = %d my_id = %d\n p_obj_actual = %p num_of_objs = %u\n",
 			GET_THREAD_ID(p_obj_actual), self->uniq_id, p_obj_actual, self->obj_write_set[ws_id].num_of_objs);
 
 		UNLOCK(p_obj_actual);
@@ -421,17 +389,13 @@ static void rlu_process_free(rlu_thread_data_t *self) {
 	int i;
 	void *p_obj;
 
-	TRACE_3(self, "start free process free_nodes_size = %ld.\n", self->free_nodes_size);
 
 	for (i = 0; i < self->free_nodes_size; i++) {
 		p_obj = self->free_nodes[i];
 
 		RLU_ASSERT_MSG(IS_UNLOCKED(p_obj),
-			self, "object is locked. p_obj = %p th_id = %ld\n",
+			self, "object is locked. p_obj = %p th_id = %d\n",
 			p_obj, GET_THREAD_ID(p_obj));
-
-		TRACE_3(self, "freeing: p_obj = %p, p_actual = %p\n",
-			p_obj, (void *)OBJ_TO_H(p_obj));
 
 		free((void *)OBJ_TO_H(p_obj));
 	}
@@ -546,14 +510,11 @@ static void rlu_sync_and_writeback(rlu_thread_data_t *self) {
 	 * using an atomic swap operation to immediately
 	 * make its change public. */
 
-	TRACE_1(self, "start, ws_num = %ld writer_version = %ld\n",
-		ws_num, self->writer_version);
-
 	rlu_synchronize(self);
 
 	ws_wb_num = rlu_writeback_write_sets_and_unlock(self);
 
-	RLU_ASSERT_MSG(ws_num == ws_wb_num, self, "failed: %ld != %ld\n", ws_num, ws_wb_num);
+	RLU_ASSERT_MSG(ws_num == ws_wb_num, self, "failed: %d != %d\n", ws_num, ws_wb_num);
 
 	self->writer_version = MAX_VERSION;
 
@@ -605,7 +566,6 @@ void rlu_init_args(int type, int ws) {
 		g_rlu_max_write_sets = ws;
 		printf(1, "RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
 	} else {
-		RLU_TRACE_GLOBAL("unknown type [%d]", RLU_TYPE);
 		exit();
 	}
 
@@ -628,7 +588,6 @@ void rlu_init(void) {
 		g_rlu_max_write_sets = RLU_NUM_WS;
 		printf(1, "RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
 	} else {
-		RLU_TRACE_GLOBAL("unknown type [%d]", RLU_TYPE);
 		abort();
 	}
 
@@ -672,9 +631,6 @@ void *rlu_alloc(obj_size_t obj_size) {
 	}
 	p_obj_h = (rlu_obj_header_t *)ptr;
 	p_obj_h->p_obj_copy = NULL;
-
-	TRACE_3_GLOBAL("ptr=%p full_size=%zu ptr_to_obj=%p\n",
-		ptr, (OBJ_HEADER_SIZE + obj_size), (void *)H_TO_OBJ(p_obj_h));
 
 	return (void *)H_TO_OBJ(p_obj_h);
 }
@@ -776,7 +732,6 @@ void *rlu_deref_slow_path(rlu_thread_data_t *self, void *p_obj) {
 
 	if (PTR_IS_COPY(p_obj_copy)) {
 		// p_obj points to a copy -> it has been already dereferenced.
-		TRACE_1(self, "got pointer to a copy. p_obj = %p p_obj_copy = %p.\n", p_obj, p_obj_copy);
 		return p_obj;
 	}
 
@@ -786,7 +741,6 @@ void *rlu_deref_slow_path(rlu_thread_data_t *self, void *p_obj) {
 
 	if (th_id == self->uniq_id) {
 		// p_obj is locked by this thread -> return the copy
-		TRACE_1(self, "got pointer to a copy. p_obj = %p th_id = %ld.\n", p_obj, th_id);
 		return p_obj_copy;
 	}
 
@@ -797,8 +751,6 @@ void *rlu_deref_slow_path(rlu_thread_data_t *self, void *p_obj) {
 			// and this thread observed a valid p_obj_copy (!= NULL)
 			// => The other thread is going to wait for this thread to finish before reusing the write-set log
 			//    (to which p_obj_copy points)
-			TRACE_1(self, "take copy from other writer th_id = %ld p_obj = %p p_obj_copy = %p\n",
-				th_id, p_obj, p_obj_copy);
 			return p_obj_copy;
 		}
 	}
@@ -814,19 +766,16 @@ int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
 
 	p_obj = *p_p_obj;
 
-	RLU_ASSERT_MSG(p_obj != NULL, self, "[%ld] rlu_try_lock: tried to lock a NULL pointer\n",
+	RLU_ASSERT_MSG(p_obj != NULL, self, "[%d] rlu_try_lock: tried to lock a NULL pointer\n",
 		       self->writer_version);
 
 	p_obj_copy = (void *)GET_COPY(p_obj);
 
 	if (PTR_IS_COPY(p_obj_copy)) {
-		TRACE_1(self, "tried to lock a copy of an object. p_obj = %p\n", p_obj);
-		TRACE_1(self, " => converting \n => copy: %p\n", p_obj);
 
 		p_obj = (void *)GET_ACTUAL(p_obj);
 		p_obj_copy = (void *)GET_COPY(p_obj);
 
-		TRACE_1(self, " => real: %p , p_obj_copy = %p\n", p_obj, p_obj_copy);
 	}
 
 	if (PTR_IS_LOCKED(p_obj_copy)) {
@@ -838,14 +787,10 @@ int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
 			if (self->run_counter == WS_GET_RUN_COUNTER(p_ws_obj_h)) {
 				// p_obj already locked by current execution of this thread.
 				// => return copy
-				TRACE_2(self, "[%ld] already locked by this thread. p_obj = %p th_id = %ld\n",
-					self->local_version, p_obj, th_id);
 				*p_p_obj = p_obj_copy;
 				return 1;
 			}
 
-			TRACE_1(self, "[%ld] already locked by another execution of this thread -> fail and sync. p_obj = %p th_id = %ld\n",
-				self->local_version, p_obj, th_id);
 			// p_obj is locked by another execution of this thread.
 			self->is_sync++;
 			return 0;
@@ -854,8 +799,6 @@ int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
 		// p_obj already locked by another thread.
 		// => send sync request to the other thread
 		// => in the meantime -> sync this thread
-		TRACE_1(self, "[%ld] already locked by another thread -> fail and request sync. p_obj = %p th_id = %ld\n",
-			self->local_version, p_obj, th_id);
 
 		rlu_send_sync_request(th_id);
 		self->is_sync++;
@@ -875,7 +818,6 @@ int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
 
 	// Try lock p_obj -> install pointer to copy
 	if (!TRY_CAS_PTR_OBJ_COPY(p_obj, p_obj_copy)) {
-		TRACE_1(self, "[%ld] CAS failed\n", self->local_version);
 		return 0;
 	}
 
@@ -887,9 +829,6 @@ int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
 	RLU_ASSERT_MSG(GET_COPY(p_obj) == p_obj_copy,
 		self, "p_obj_copy = %p my_p_obj_copy = %p\n",
 		GET_COPY(p_obj), p_obj_copy);
-
-	TRACE_2(self, "[%ld] p_obj = %p is locked, p_obj_copy = %p , th_id = %ld\n",
-		self->local_version, p_obj, GET_COPY(p_obj), GET_THREAD_ID(p_obj));
 
 	*p_p_obj = p_obj_copy;
 	return 1;
