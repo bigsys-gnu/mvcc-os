@@ -9,6 +9,7 @@ USER_PROGS := \
 	tester\
 	usertests\
 	wc\
+	malloc\
 	basic_thread\
 	clone3-test\
 	rlu_test
