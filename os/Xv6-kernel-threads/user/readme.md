@@ -20,6 +20,7 @@ the benchmarks are distributed separately by each synchronization technique like
 > $ benchlist
 2. or run it with parameters.
 > $ benchlist (#thread) (#initial node) (bucket size) (time duration, ms) (update ratio) (range of key value)
+
 Caution: order of the parameters is fixed. but you can omit it's backside in order.
 
 ## Dependency

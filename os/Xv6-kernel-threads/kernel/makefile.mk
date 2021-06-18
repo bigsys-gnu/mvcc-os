@@ -28,6 +28,7 @@ KERNEL_OBJECTS := \
 	uart.o\
 	vectors.o\
 	vm.o\
+	bench.o\
 
 KERNEL_OBJECTS := $(addprefix kernel/, $(KERNEL_OBJECTS))
 

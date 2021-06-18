@@ -31,6 +31,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int bench(void);
 
 // user library functions (ulib.c)
 int stat(char*, struct stat*);

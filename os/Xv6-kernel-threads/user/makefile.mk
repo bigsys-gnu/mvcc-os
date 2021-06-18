@@ -21,6 +21,7 @@ USER_PROGS := \
 	benchlist\
 	benchlist_spinlock\
 	benchlist_rcu\
+	benchlist_k\
 	# size-test\
 	# join2-test\
 	# join3-test\
