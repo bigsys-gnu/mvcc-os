@@ -89,7 +89,7 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    // lock_acquire(list->lk);
+    // lock_acquire(&list->lk);
 
     if(list->head == NULL)
     {
@@ -122,7 +122,7 @@ int list_insert(int key, spinlock_list_t *list)
     else{
         // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
     }
-    // lock_release(list->lk);
+    // lock_release(&list->lk);
 
     return ret;
 }
@@ -131,7 +131,7 @@ int list_delete(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret = 0;
-    // lock_acquire(list->lk);
+    // lock_acquire(&list->lk);
     if(list->head == NULL){
         return ret;
     }
@@ -157,7 +157,7 @@ int list_delete(int key, spinlock_list_t *list)
     else{
         // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
     }
-    // lock_release(list->lk);
+    // lock_release(&list->lk);
 
     return ret;
 }
@@ -167,16 +167,17 @@ int list_find(int key, spinlock_list_t *list)
     node_t *prev, *cur;
     int ret, val;
 
+    // lock_acquire(&list->lk);
     for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
         if ((val = cur->value) >= key)
             break;
         ret = (val == key);
     }
+    // lock_release(&list->lk);
 
     return ret;
 }
-
 
 void test(void* param)
 {
@@ -192,7 +193,6 @@ void test(void* param)
         value = randomrange(1, p_data->range);
         bucket = HASH_VALUE(p_hash_list, value);
         spinlock_list_t *p_list = p_hash_list->buckets[bucket];
-
         if (op < p_data->update)
         {
             if ((op & 0x01) == 0)
@@ -220,7 +220,7 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        sleep(1);
+        // sleep(1);
     }
 
     printf(1, "thread %d end\n", getpid());
@@ -274,8 +274,8 @@ int main(int argc, char **argv)
 	assert(duration >= 0);
 	assert(initial >= 0);
 	assert(nb_threads > 0);
-   	assert(update > 0);
-	assert(range > 0);
+	assert(update >= 0 && update <= 1000);
+	assert(range > 0 && range >= initial);
 
     p_hash_list = (hash_list_t *)malloc(sizeof(hash_list_t));
     if (p_hash_list == NULL) {
@@ -347,13 +347,15 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        sleep(1);
+        // sleep(1);
     }
 
+    printf(1,"join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         thread_join();
     }
+    printf(1," done!\n");
 
     printf(1, "\n####result####\n");
 	for (int i = 0; i < nb_threads; i++) {
@@ -395,6 +397,6 @@ int main(int argc, char **argv)
     {
 		printf(1,"\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", exp, total_size);
     }
-    printf(1, "bench_list end\n");
+    printf(1, "benchlist end\n");
     exit();
 }

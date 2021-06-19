@@ -26,8 +26,7 @@ typedef struct node {
 } node_t;
 
 typedef struct spinlock_list {
-    int bucket_id;
-    // lock_t lk;
+    lock_t lk;
     node_t *head;
 } spinlock_list_t;
 
@@ -49,7 +48,6 @@ typedef struct thread_param {
     int result_found;
     int *stop;
     hash_list_t *p_hash_list;
-    int tidx;
 } thread_param_t;
 
 int list_deletes()
@@ -91,7 +89,7 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    urcu_writer_lock(list->bucket_id);
+    // lock_acquire(list->lk);
 
     if(list->head == NULL)
     {
@@ -124,7 +122,7 @@ int list_insert(int key, spinlock_list_t *list)
     else{
         // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
     }
-    urcu_writer_unlock(list->bucket_id);
+    // lock_release(list->lk);
 
     return ret;
 }
@@ -133,7 +131,7 @@ int list_delete(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret = 0;
-    urcu_writer_lock(list->bucket_id);
+    // lock_acquire(list->lk);
     if(list->head == NULL){
         return ret;
     }
@@ -159,28 +157,26 @@ int list_delete(int key, spinlock_list_t *list)
     else{
         // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
     }
-    urcu_writer_unlock(list->bucket_id);
+    // lock_release(list->lk);
 
     return ret;
 }
 
-int list_find(int key, spinlock_list_t *list, int tidx)
+int list_find(int key, spinlock_list_t *list)
 {
     node_t *prev, *cur;
     int ret, val;
 
-    urcu_reader_lock(tidx);
     for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
         if ((val = cur->value) >= key)
             break;
         ret = (val == key);
-        // printf(1, "ret: %d\n", ret);
     }
-    urcu_reader_unlock(tidx);
 
     return ret;
 }
+
 
 void test(void* param)
 {
@@ -189,8 +185,6 @@ void test(void* param)
 
     thread_param_t *p_data = (thread_param_t*)param; 
     hash_list_t *p_hash_list = p_data->p_hash_list;
-
-    urcu_register(p_data->tidx);
 
     while (*p_data->stop == 0)
     {
@@ -220,16 +214,15 @@ void test(void* param)
         }
         else
         {
-            if(list_find(value, p_list, p_data->tidx))
+            if(list_find(value, p_list))
             {
                 p_data->result_contains++;
             }
             p_data->result_found++;
         }
-        // sleep(1);
+        sleep(1);
     }
 
-    // urcu_unregister(p_data->tidx);
     printf(1, "thread %d end\n", getpid());
     exit();
 }
@@ -281,8 +274,8 @@ int main(int argc, char **argv)
 	assert(duration >= 0);
 	assert(initial >= 0);
 	assert(nb_threads > 0);
-	assert(update >= 0 && update <= 1000);
-	assert(range > 0 && range >= initial);
+   	assert(update > 0);
+	assert(range > 0);
 
     p_hash_list = (hash_list_t *)malloc(sizeof(hash_list_t));
     if (p_hash_list == NULL) {
@@ -299,7 +292,7 @@ int main(int argc, char **argv)
             exit();
         }
         list->head = NULL;
-        list->bucket_id = i;
+        lock_init(&list->lk);
         p_hash_list->buckets[i] = list;
     }
 
@@ -322,7 +315,6 @@ int main(int argc, char **argv)
         printf(1,"thread_list init error\n");
         exit();
     }
-    urcu_init(nb_threads);
 
     param_list = (thread_param_t *)malloc(nb_threads*sizeof(thread_param_t));
     if (param_list == NULL) {
@@ -337,7 +329,6 @@ int main(int argc, char **argv)
         param_list[i].n_buckets = n_buckets;
         param_list[i].initial = initial;
         param_list[i].nb_threads = nb_threads;
-        param_list[i].tidx = i;
         param_list[i].update = update;
         param_list[i].range = range;
         param_list[i].stop = &stop;
@@ -356,15 +347,13 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        // sleep(1);
+        sleep(1);
     }
 
-    printf(1,"join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         thread_join();
     }
-    printf(1," done!\n");
 
     printf(1, "\n####result####\n");
 	for (int i = 0; i < nb_threads; i++) {
@@ -406,6 +395,6 @@ int main(int argc, char **argv)
     {
 		printf(1,"\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", exp, total_size);
     }
-    printf(1, "benchlist_rcu end\n");
+    printf(1, "bench_list end\n");
     exit();
 }

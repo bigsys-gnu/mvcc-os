@@ -220,7 +220,7 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        sleep(1);
+        // sleep(1);
     }
 
     printf(1, "thread %d end\n", getpid());
@@ -274,8 +274,8 @@ int main(int argc, char **argv)
 	assert(duration >= 0);
 	assert(initial >= 0);
 	assert(nb_threads > 0);
-   	assert(update > 0);
-	assert(range > 0);
+	assert(update >= 0 && update <= 1000);
+	assert(range > 0 && range >= initial);
 
     p_hash_list = (hash_list_t *)malloc(sizeof(hash_list_t));
     if (p_hash_list == NULL) {
@@ -347,13 +347,15 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        sleep(1);
+        // sleep(1);
     }
 
+    printf(1,"join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         thread_join();
     }
+    printf(1," done!\n");
 
     printf(1, "\n####result####\n");
 	for (int i = 0; i < nb_threads; i++) {
@@ -395,6 +397,6 @@ int main(int argc, char **argv)
     {
 		printf(1,"\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", exp, total_size);
     }
-    printf(1, "bench_list end\n");
+    printf(1, "benchlist_spinlock end\n");
     exit();
 }
