@@ -4,14 +4,15 @@ USER_PROGS := \
 	cat\
 	init\
 	ls\
+	ln\
 	sh\
-	size-test\
-	tester\
-	usertests\
+	grep\
+	kill\
+	echo\
+	rm\
 	wc\
 	malloc\
-	basic_thread\
-	clone3-test\
+	zombie\
 	rlu_test
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
