@@ -50,6 +50,29 @@ typedef struct thread_param {
     hash_list_t *p_hash_list;
 } thread_param_t;
 
+lock_t ml;
+
+void *
+th_malloc(uint size)
+{
+  static short init = 0;
+  void *ret;
+  if (__sync_bool_compare_and_swap(&init, 0, 1))
+	lock_init(&ml);
+  lock_acquire(&ml);
+  ret = malloc(size);
+  lock_release(&ml);
+  return ret;
+}
+
+void
+th_free(void *tr)
+{
+  lock_acquire(&ml);
+  free(tr);
+  lock_release(&ml);
+}
+
 int list_deletes()
 {
    return 0; 
@@ -93,7 +116,7 @@ int list_insert(int key, spinlock_list_t *list)
 
     if(list->head == NULL)
     {
-        new_node = (node_t*)malloc(sizeof(node_t));
+        new_node = (node_t*)th_malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
         list->head = new_node;
@@ -114,7 +137,7 @@ int list_insert(int key, spinlock_list_t *list)
 
     if(ret){
         //no node with key value
-        new_node = (node_t *)malloc(sizeof(node_t));
+        new_node = (node_t *)th_malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
         prev->next = new_node;
@@ -153,7 +176,7 @@ int list_delete(int key, spinlock_list_t *list)
     {
         //node to delete with key value
         prev->next = cur->next;
-        free(cur);
+        th_free(cur);
         // printf(1, "delete node value : %d\tpid : %d\n", key, getpid());
     }
     else{
@@ -225,7 +248,7 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        sleep(1);
+        /* sleep(1); */
     }
 
     printf(1, "thread %d end\n", getpid());
@@ -282,7 +305,7 @@ int main(int argc, char **argv)
 	assert(update >= 0 && update <= 1000);
 	assert(range > 0 && range >= initial);
 
-    p_hash_list = (hash_list_t *)malloc(sizeof(hash_list_t));
+    p_hash_list = (hash_list_t *)th_malloc(sizeof(hash_list_t));
     if (p_hash_list == NULL) {
 	    printf(1,"hash_list init error\n");
 	    exit();
@@ -291,7 +314,7 @@ int main(int argc, char **argv)
 
     for (int i = 0; i < p_hash_list->n_buckets; i++) {
         spinlock_list_t *list;
-        list = (spinlock_list_t *)malloc(sizeof(spinlock_list_t));
+        list = (spinlock_list_t *)th_malloc(sizeof(spinlock_list_t));
         if (list == NULL) {
             printf(1,"spinlock_list init error\n");
             exit();
@@ -315,13 +338,13 @@ int main(int argc, char **argv)
     }
     printf(1,"done\n");
 
-    thread_list = (int *)malloc(nb_threads*sizeof(int));
+    thread_list = (int *)th_malloc(nb_threads*sizeof(int));
     if (thread_list == NULL) {
         printf(1,"thread_list init error\n");
         exit();
     }
 
-    param_list = (thread_param_t *)malloc(nb_threads*sizeof(thread_param_t));
+    param_list = (thread_param_t *)th_malloc(nb_threads*sizeof(thread_param_t));
     if (param_list == NULL) {
         printf(1,"param_list init error\n");
         exit();
@@ -352,7 +375,7 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        sleep(1);
+        /* sleep(1); */
     }
 
     printf(1,"join %d threads...\n", nb_threads);

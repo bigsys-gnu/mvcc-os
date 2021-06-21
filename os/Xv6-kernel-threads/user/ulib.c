@@ -9,6 +9,28 @@
 #include "fs.h"
 #define PGSIZE 4096
 
+lock_t ml;
+
+static void *
+th_malloc(uint size)
+{
+  static short init = 0;
+  void *ret;
+  if (__sync_bool_compare_and_swap(&init, 0, 1))
+	lock_init(&ml);
+  lock_acquire(&ml);
+  ret = malloc(size);
+  lock_release(&ml);
+  return ret;
+}
+
+static void
+th_free(void *tr)
+{
+  lock_acquire(&ml);
+  free(tr);
+  lock_release(&ml);
+}
 
 int lock_init(lock_t *lk)
 {
@@ -29,11 +51,7 @@ void lock_release(lock_t *lk){
 int
 thread_create(void (*start_routine)(void*), void *arg)
 {
-	lock_t lk;
-	lock_init(&lk);
-	lock_acquire(&lk);
-	void *stack= malloc(PGSIZE*2);
-	lock_release(&lk);
+	void *stack= th_malloc(PGSIZE*2);
 
 	if((uint)stack % PGSIZE)
 		stack = stack + (PGSIZE - (uint)stack % PGSIZE);
@@ -43,14 +61,10 @@ thread_create(void (*start_routine)(void*), void *arg)
 }
 
 int thread_join(){
-	void *stack = malloc(sizeof(void*));
+	void *stack = th_malloc(sizeof(void*));
 	int result= join(&stack);
 
-	lock_t lk;
-	lock_init(&lk);
-	lock_acquire(&lk);
-	free(stack);
-	lock_release(&lk);
+	th_free(stack);
 
 	return result;
 }

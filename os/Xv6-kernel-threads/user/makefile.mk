@@ -22,11 +22,11 @@ USER_PROGS := \
 	benchlist_spinlock\
 	benchlist_rcu\
 	benchlist_k\
+	thread2-test
 	# size-test\
 	# join2-test\
 	# join3-test\
 	# thread-test\
-	# thread2-test\
 	# clone3-test\
 	# stack-test\
 	# test_fork\
@@ -42,8 +42,7 @@ USER_LIBS := \
 	ulib.o\
 	usys.o\
 	printf.o\
-	new-urcu.o\
-	
+	new-urcu.o
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
 
