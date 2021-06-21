@@ -110,7 +110,6 @@ int list_insert(int key, spinlock_list_t *list)
                 ret = 0;
                 break;
             }
-            // sleep(0);
         }
     }
 
@@ -147,7 +146,6 @@ int list_delete(int key, spinlock_list_t *list)
                 ret = 1;
                 break;
             }
-            // sleep(0);
         }
     }
 
@@ -174,14 +172,12 @@ int list_find(int key, spinlock_list_t *list, int tidx)
     urcu_reader_lock(tidx);
     for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
-        if ((val = cur->value) >= key)
-            break;
+        // if ((val = cur->value) >= key)
+        //     break;
+        val = cur->value;
         ret = (val == key);
-        // printf(1, "ret: %d\n", ret);
-        // sleep(0);
     }
     urcu_reader_unlock(tidx);
-    sleep(0);
 
     return ret;
 }
@@ -230,7 +226,6 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        sleep(1);
     }
 
     urcu_unregister(p_data->tidx);
@@ -281,7 +276,7 @@ int main(int argc, char **argv)
     printf(1, "-range        : %d\n", range);
     printf(1,"-Set type     : hash-list\n");
 
-	assert(n_buckets >= 1);
+	assert(n_buckets >= 1 && n_buckets <= MAX_BUCKETS);
 	assert(duration >= 0);
 	assert(initial >= 0);
 	assert(nb_threads > 0);
@@ -360,16 +355,15 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        sleep(1);
     }
 
     printf(1,"join %d threads...\n", nb_threads);
-    for(int i = 0; i < nb_threads; i++)
-    {
-        thread_join();
-        // sleep(0);
-    }
-    printf(1," done!\n");
+    // for(int i = 0; i < nb_threads; i++)
+    // {
+    //     thread_join();
+    // }
+    sleep(3000);
+    printf(1,"done!\n");
 
     printf(1, "\n####result####\n");
 	for (int i = 0; i < nb_threads; i++) {
@@ -382,20 +376,24 @@ int main(int argc, char **argv)
 		updates += (param_list[i].result_add + param_list[i].result_remove);
 		total_variation += param_list[i].variation;
 	}
+    printf(1, "\n######## \n");
 
     total_size = 0;
-    for(int i = 0; i < n_buckets; i++)
-    {
-        node_t *node = p_hash_list->buckets[i]->head;
-        while(node != NULL)
-        {
-            node = node->next;
-            total_size++;
-        }
-    }
-    exp = initial + total_variation;
+    // for(int i = 0; i < n_buckets; i++)
+    // {
+    //     printf(1, "gathering %dbucket \n", i);
+    //     node_t *node = p_hash_list->buckets[i]->head;
+    //     while(node != NULL)
+    //     {
+    //         node = node->next;
+    //         total_size++;
+    //         // printf(1, "a");
+    //         sleep(0);
+    //     }
+    // }
+    // exp = initial + total_variation;
 
-    printf(1, "Set size      : %d (expected: %d)\n", total_size, exp);
+    // printf(1, "Set size      : %d (expected: %d)\n", total_size, exp);
     printf(1, "Duration      : %d (ms)\n", duration);
     iv = (reads + updates) * 1000.0 / duration;
     fv = (int)((reads + updates) * 1000.0 / duration * 10) % 10;
