@@ -11,7 +11,7 @@
 
 #define PGSIZE (4096)
 
-#define MAX_BUCKETS (2000)
+#define MAX_BUCKETS (128)
 #define DEFAULT_BUCKETS                 1
 #define DEFAULT_DURATION                1000
 #define DEFAULT_UPDATE                  200
@@ -108,6 +108,7 @@ int list_insert(int key, spinlock_list_t *list)
                 ret = 0;
                 break;
             }
+            // sleep(0);
         }
     }
 
@@ -144,6 +145,7 @@ int list_delete(int key, spinlock_list_t *list)
                 ret = 1;
                 break;
             }
+            // sleep(0);
         }
     }
 
@@ -173,8 +175,10 @@ int list_find(int key, spinlock_list_t *list)
         if ((val = cur->value) >= key)
             break;
         ret = (val == key);
+        // sleep(0);
     }
     lock_release(&list->lk);
+    sleep(0);
 
     return ret;
 }
@@ -220,7 +224,7 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        // sleep(1);
+        sleep(1);
     }
 
     printf(1, "thread %d end\n", getpid());
@@ -233,7 +237,7 @@ int main(int argc, char **argv)
     hash_list_t *p_hash_list;
     int *thread_list;
     int stop = 0, initial_time = 0;
-    int exp = 0, total_variation = 0, total_size = 0;
+    unsigned long exp = 0, total_variation = 0, total_size = 0;
     unsigned long reads = 0, updates = 0;
     unsigned long iv = 0, fv = 0;
 
@@ -347,13 +351,14 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        // sleep(1);
+        sleep(1);
     }
 
     printf(1,"join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         thread_join();
+        // sleep(0);
     }
     printf(1," done!\n");
 
