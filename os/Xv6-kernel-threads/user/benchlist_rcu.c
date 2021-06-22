@@ -4,7 +4,7 @@
 #include "param.h"
 #include "stat.h"
 #include "x86.h"
-#include "new-urcu.h"
+#include "rcu.h"
 
 #undef NULL
 #define NULL ((void*)0)
@@ -20,6 +20,8 @@
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
 
+struct rcu_maintain rcu_global;
+
 typedef struct node {
     int value;
     struct node *next;
@@ -27,7 +29,7 @@ typedef struct node {
 
 typedef struct spinlock_list {
     int bucket_id;
-    // lock_t lk;
+    lock_t lk;
     node_t *head;
 } spinlock_list_t;
 
@@ -91,7 +93,7 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    urcu_writer_lock(list->bucket_id);
+	lock_acquire(&list->lk);
 
     if(list->head == NULL)
     {
@@ -125,16 +127,18 @@ int list_insert(int key, spinlock_list_t *list)
     else{
         // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
     }
-    urcu_writer_unlock(list->bucket_id);
+	lock_release(&list->lk);
 
     return ret;
 }
 
-int list_delete(int key, spinlock_list_t *list)
+int list_delete(int key, spinlock_list_t *list, struct rcu_data *d)
 {
     node_t *prev, *cur;
     int ret = 0;
-    urcu_writer_lock(list->bucket_id);
+
+	lock_acquire(&list->lk);
+
     if(list->head == NULL){
         return ret;
     }
@@ -155,23 +159,25 @@ int list_delete(int key, spinlock_list_t *list)
     {
         //node to delete with key value
         prev->next = cur->next;
+		lock_release(&list->lk);
+		rcu_synchronize(&rcu_global, d);
         free(cur);
         // printf(1, "delete node value : %d\tpid : %d\n", key, getpid());
     }
     else{
         // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
+		lock_release(&list->lk);
     }
-    urcu_writer_unlock(list->bucket_id);
 
     return ret;
 }
 
-int list_find(int key, spinlock_list_t *list, int tidx)
+int list_find(int key, spinlock_list_t *list, struct rcu_data *d)
 {
     node_t *prev, *cur;
     int ret, val;
 
-    urcu_reader_lock(tidx);
+	rcu_reader_lock(&rcu_global, d);
     for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
         if ((val = cur->value) >= key)
@@ -180,8 +186,7 @@ int list_find(int key, spinlock_list_t *list, int tidx)
         // printf(1, "ret: %d\n", ret);
         // sleep(0);
     }
-    urcu_reader_unlock(tidx);
-    sleep(0);
+	rcu_reader_unlock(&rcu_global, d);
 
     return ret;
 }
@@ -190,11 +195,11 @@ void test(void* param)
 {
     int op, bucket, value;
     value = 1;//sys_uptime();
+	struct rcu_data self;
 
     thread_param_t *p_data = (thread_param_t*)param; 
     hash_list_t *p_hash_list = p_data->p_hash_list;
-
-    urcu_register(p_data->tidx);
+	self.id = p_data->tidx;
 
     while (*p_data->stop == 0)
     {
@@ -215,7 +220,7 @@ void test(void* param)
             }
             else
             {
-                if (list_delete(value, p_list))
+			    if (list_delete(value, p_list, &self))
                 {
                     p_data->variation--;
                 }
@@ -224,7 +229,7 @@ void test(void* param)
         }
         else
         {
-            if(list_find(value, p_list, p_data->tidx))
+            if(list_find(value, p_list, &self))
             {
                 p_data->result_contains++;
             }
@@ -233,7 +238,6 @@ void test(void* param)
         sleep(1);
     }
 
-    urcu_unregister(p_data->tidx);
     printf(1, "thread %d end\n", getpid());
     exit();
 }
@@ -304,6 +308,7 @@ int main(int argc, char **argv)
         }
         list->head = NULL;
         list->bucket_id = i;
+		lock_init(&list->lk);
         p_hash_list->buckets[i] = list;
     }
 
@@ -326,7 +331,7 @@ int main(int argc, char **argv)
         printf(1,"thread_list init error\n");
         exit();
     }
-    urcu_init(nb_threads);
+    rcu_init(&rcu_global, nb_threads);
 
     param_list = (thread_param_t *)malloc(nb_threads*sizeof(thread_param_t));
     if (param_list == NULL) {
