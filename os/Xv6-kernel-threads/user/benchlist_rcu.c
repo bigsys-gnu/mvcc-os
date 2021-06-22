@@ -93,14 +93,17 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
+	new_node = (node_t*)th_malloc(sizeof(node_t));
+
 	lock_acquire(&list->lk);
 
     if(list->head == NULL)
     {
-        new_node = (node_t*)malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
         list->head = new_node;
+		lock_release(&list->lk);
+		return ret;
     }
     else
     {
@@ -118,18 +121,17 @@ int list_insert(int key, spinlock_list_t *list)
 
     if(ret){
         //no node with key value
-        new_node = (node_t *)malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
 		do {prev->next = new_node;
 		  __sync_synchronize();
 		} while(0);
-        // printf(1, "insert_node value : %d\tpid : %d\n", key, getpid());
+		lock_release(&list->lk);
     }
     else{
-        // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
+	  lock_release(&list->lk);
+	  th_free(new_node);
     }
-	lock_release(&list->lk);
 
     return ret;
 }
@@ -153,7 +155,6 @@ int list_delete(int key, spinlock_list_t *list, struct rcu_data *d)
                 ret = 1;
                 break;
             }
-            // sleep(0);
         }
     }
 
@@ -164,10 +165,8 @@ int list_delete(int key, spinlock_list_t *list, struct rcu_data *d)
 		lock_release(&list->lk);
 		rcu_synchronize(&rcu_global, d);
         th_free(cur);
-        // printf(1, "delete node value : %d\tpid : %d\n", key, getpid());
     }
     else{
-        // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
 		lock_release(&list->lk);
     }
 
@@ -185,8 +184,6 @@ int list_find(int key, spinlock_list_t *list, struct rcu_data *d)
         if ((val = cur->value) >= key)
             break;
         ret = (val == key);
-        // printf(1, "ret: %d\n", ret);
-        // sleep(0);
     }
 	rcu_reader_unlock(&rcu_global, d);
 
@@ -237,7 +234,6 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        /* sleep(1); */
     }
 
     printf(1, "thread %d end\n", getpid());
@@ -367,14 +363,12 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        /* sleep(1); */
     }
 
     printf(1,"join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         thread_join();
-        // sleep(0);
     }
     printf(1," done!\n");
 
