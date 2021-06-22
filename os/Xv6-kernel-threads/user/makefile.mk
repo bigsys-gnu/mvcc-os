@@ -32,7 +32,6 @@ USER_PROGS := \
 	# test_fork\
 	# zombie\
 	# list_rcu\
-	# asdf\
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -42,7 +41,7 @@ USER_LIBS := \
 	ulib.o\
 	usys.o\
 	printf.o\
-	new-urcu.o
+	# new-urcu.o\
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
 
