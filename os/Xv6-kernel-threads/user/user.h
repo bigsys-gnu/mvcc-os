@@ -8,6 +8,14 @@ typedef struct __lock_t{
 	uint flag;
 }lock_t;
 
+#define assert(x) if (x) {} else { \
+   printf(1, "%s: %d ", __FILE__, __LINE__); \
+   printf(1, "assert failed (%s)\n", # x); \
+   printf(1, "TEST FAILED\n"); \
+   kill(getpid());			   \
+   exit(); \
+}
+
 // system calls
 void* malloc(uint);
 int clone(void(*fcn)(void*), void*, void*);
