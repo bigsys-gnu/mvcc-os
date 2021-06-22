@@ -60,6 +60,8 @@ int thread_join();
 int lock_init(lock_t *lk);
 void lock_acquire(lock_t *lk);
 void lock_release(lock_t *lk);
+void * th_malloc(uint size);
+void th_free(void *tr);
 
 // rcu syscall
 int rcu_init(struct rcu_maintain *rm, int num_threads);

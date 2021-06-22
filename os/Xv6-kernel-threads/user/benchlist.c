@@ -49,29 +49,6 @@ typedef struct thread_param {
     hash_list_t *p_hash_list;
 } thread_param_t;
 
-lock_t ml;
-
-void *
-th_malloc(uint size)
-{
-  static short init = 0;
-  void *ret;
-  if (__sync_bool_compare_and_swap(&init, 0, 1))
-	lock_init(&ml);
-  lock_acquire(&ml);
-  ret = malloc(size);
-  lock_release(&ml);
-  return ret;
-}
-
-void
-th_free(void *tr)
-{
-  lock_acquire(&ml);
-  free(tr);
-  lock_release(&ml);
-}
-
 int list_deletes()
 {
    return 0; 

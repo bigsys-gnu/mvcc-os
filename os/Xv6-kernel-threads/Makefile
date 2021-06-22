@@ -88,7 +88,7 @@ ifndef CPUS
 CPUS := 2
 endif
 
-QEMUOPTS := -hdb fs.img xv6.img -smp $(CPUS)
+QEMUOPTS := -hdb fs.img xv6.img -smp $(CPUS) -m 2G
 
 ################################################################################
 # Main Targets

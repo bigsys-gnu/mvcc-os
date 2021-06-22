@@ -11,7 +11,7 @@
 
 lock_t ml;
 
-static void *
+void *
 th_malloc(uint size)
 {
   static short init = 0;
@@ -24,7 +24,7 @@ th_malloc(uint size)
   return ret;
 }
 
-static void
+void
 th_free(void *tr)
 {
   lock_acquire(&ml);
@@ -61,10 +61,11 @@ thread_create(void (*start_routine)(void*), void *arg)
 }
 
 int thread_join(){
-	void *stack = th_malloc(sizeof(void*));
+    void *stack = NULL;
 	int result= join(&stack);
 
-	th_free(stack);
+	if (result)
+	  th_free(stack);
 
 	return result;
 }

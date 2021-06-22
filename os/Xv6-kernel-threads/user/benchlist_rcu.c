@@ -121,7 +121,9 @@ int list_insert(int key, spinlock_list_t *list)
         new_node = (node_t *)malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
-        prev->next = new_node;
+		do {prev->next = new_node;
+		  __sync_synchronize();
+		} while(0);
         // printf(1, "insert_node value : %d\tpid : %d\n", key, getpid());
     }
     else{
@@ -161,7 +163,7 @@ int list_delete(int key, spinlock_list_t *list, struct rcu_data *d)
         prev->next = cur->next;
 		lock_release(&list->lk);
 		rcu_synchronize(&rcu_global, d);
-        free(cur);
+        th_free(cur);
         // printf(1, "delete node value : %d\tpid : %d\n", key, getpid());
     }
     else{
@@ -201,7 +203,7 @@ void test(void* param)
     hash_list_t *p_hash_list = p_data->p_hash_list;
 	self.id = p_data->tidx;
 
-    while (*p_data->stop == 0)
+    while (*(p_data->stop) == 0)
     {
         op = randomrange(1, 1000);
         value = randomrange(1, p_data->range);
@@ -235,7 +237,7 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        sleep(1);
+        /* sleep(1); */
     }
 
     printf(1, "thread %d end\n", getpid());
@@ -365,7 +367,7 @@ int main(int argc, char **argv)
             printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        sleep(1);
+        /* sleep(1); */
     }
 
     printf(1,"join %d threads...\n", nb_threads);
