@@ -20,14 +20,11 @@ struct foo {
 };
 
 struct foo *global_foo;
-lock_t ml;
 
 struct foo *
 rlu_new_node(void)
 {
-  lock_acquire(&ml);
   struct foo *p_new_foo = (struct foo *)RLU_ALLOC(sizeof(struct foo));
-  lock_release(&ml);
   if (p_new_foo == NULL)
 	{
 	  printf(1, "out of memory\n");
@@ -55,9 +52,7 @@ void foo_update_a(rlu_thread_data_t *self, int new_a)
 	  goto restart;
 	}
   RLU_ASSIGN_PTR(self, &global_foo, new_fp);
-  lock_acquire(&ml);
   RLU_FREE(self, old_fp);
-  lock_release(&ml);
   FREED_CHECK(old_fp);
 
   RLU_READER_UNLOCK(self);
@@ -103,7 +98,6 @@ int main(int argc, char *argv[])
   int i;
 
   RLU_INIT();
-  lock_init(&ml);
   init_global_foo(34);
 
   for (i = 0; i < NUM_THREAD; ++i)

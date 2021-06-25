@@ -390,7 +390,7 @@ static void rlu_process_free(rlu_thread_data_t *self) {
 			self, "object is locked. p_obj = %p th_id = %d\n",
 			p_obj, GET_THREAD_ID(p_obj));
 
-		free((void *)OBJ_TO_H(p_obj));
+		th_free((void *)OBJ_TO_H(p_obj));
 	}
 
 	self->free_nodes_size = 0;
@@ -618,7 +618,7 @@ void *rlu_alloc(obj_size_t obj_size) {
 	void *ptr;
 	rlu_obj_header_t *p_obj_h;
 
-	ptr = (void *)malloc(OBJ_HEADER_SIZE + obj_size);
+	ptr = (void *)th_malloc(OBJ_HEADER_SIZE + obj_size);
 	if (ptr == NULL) {
 		return NULL;
 	}
@@ -634,7 +634,7 @@ void rlu_free(rlu_thread_data_t *self, void *p_obj) {
 	}
 
 	if (self == NULL) {
-		free((void *)OBJ_TO_H(p_obj));
+		th_free((void *)OBJ_TO_H(p_obj));
 		return;
 	}
 	
@@ -798,7 +798,7 @@ int rlu_try_lock(rlu_thread_data_t *self, void **p_p_obj, size_t obj_size) {
 		return 0;
 	}
 
-	// p_obj is free
+	// p_obj is th_free
 
 	// Indicate that write-set is updated
 	if (self->is_write_detected == 0) {
