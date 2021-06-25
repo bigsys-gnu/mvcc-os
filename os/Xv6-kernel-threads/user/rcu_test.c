@@ -25,14 +25,11 @@ int sanity_failed;
 	__sync_add_and_fetch(&sanity_failed, 1)
 
 #define FREE_FOO(FOO_PTR)\
-	lock_acquire(&ml);   \
 	FOO_PTR->freed = 1;	 \
-	free(FOO_PTR);       \
-	lock_release(&ml)
+	th_free(FOO_PTR);
 
 struct rcu_maintain rm;
 lock_t lk;						/* rcu write lock */
-lock_t ml;						/* memory allocation lock */
 
 
 /* rcu example from https://www.kernel.org/doc/html/latest/RCU/whatisRCU.html#id6 */
@@ -47,9 +44,7 @@ struct foo *global_foo;
 struct foo *
 create_foo(int new_a)
 {
-  lock_acquire(&ml);
-  struct foo *new_fp = (struct foo *) malloc(sizeof(struct foo));
-  lock_release(&ml);
+  struct foo *new_fp = (struct foo *) th_malloc(sizeof(struct foo));
 
   if (new_fp)
 	{
@@ -154,8 +149,7 @@ main(void)
   rcu_init(&rm, THREAD_NUM);
   printf(1, "on user rm: %p\n", &rm);
   lock_init(&lk);
-  lock_init(&ml);
-  global_foo = (struct foo *) malloc(sizeof(struct foo));
+  global_foo = (struct foo *) th_malloc(sizeof(struct foo));
   global_foo->a = 1;
   global_foo->freed = 0;
 

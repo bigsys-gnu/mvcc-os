@@ -33,7 +33,6 @@ void rcu_init(struct rcu_maintain *rm, int num_threads)
   int i;
   /* rcu_node *new; */
 
-  cprintf("rm val: %p\n", rm);
   if (num_threads > MAX_THREADS)
 	{
 	  rm && (rm->threads = -1);
