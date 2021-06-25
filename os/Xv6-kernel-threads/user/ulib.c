@@ -154,3 +154,15 @@ memmove(void *vdst, void *vsrc, int n)
     *dst++ = *src++;
   return vdst;
 }
+
+/* from geeksforgeeks.org */
+void
+memcpy(void *dest, void *src, size_t n)
+{
+  int i;
+  char *csrc = (char *)src;
+  char *cdest = (char *)dest;
+
+  for (i = 0; i < n; ++i)
+	cdest[i] = csrc[i];
+}

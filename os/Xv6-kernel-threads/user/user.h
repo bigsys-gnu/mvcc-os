@@ -1,13 +1,14 @@
 #ifndef _USER_H_
 #define _USER_H_
 
+#include "types.h"
+
 struct stat;
 typedef struct __lock_t{
 	uint flag;
 }lock_t;
 
 // system calls
-void* malloc(uint);
 int clone(void(*fcn)(void*), void*, void*);
 int fork(void);
 int exit(void) __attribute__((noreturn));
@@ -42,6 +43,8 @@ void printf(int, char*, ...);
 char* gets(char*, int max);
 uint strlen(char*);
 void* memset(void*, int, uint);
+void memcpy(void *dest, void *src, size_t n);
+void* malloc(uint);
 void free(void*);
 int atoi(const char*);
 int thread_create(void (*start_routine)(void*), void *arg);
