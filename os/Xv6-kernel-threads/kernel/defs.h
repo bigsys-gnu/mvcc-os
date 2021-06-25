@@ -9,6 +9,8 @@ struct pipe;
 struct proc;
 struct spinlock;
 struct stat;
+struct rcu_maintain;
+struct rcu_data;
 
 // bio.c
 void            binit(void);
@@ -170,6 +172,14 @@ pde_t*          copyuvm(pde_t*, uint);
 void            switchuvm(struct proc*);
 void            switchkvm(void);
 int             copyout(pde_t*, uint, void*, uint);
+
+// rcu.c
+void rcu_init(struct rcu_maintain *rm, int num_threads);
+void rcu_reader_lock(struct rcu_maintain *rm, struct rcu_data *d);
+void rcu_reader_unlock(struct rcu_maintain *rm, struct rcu_data *d);
+void rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d);
+void rcu_register(struct rcu_maintain *rm, struct rcu_data *d);
+void rcu_unregister(struct rcu_data *d);
 
 // number of elements in fixed-size array
 #define NELEM(x) (sizeof(x)/sizeof((x)[0]))

@@ -4,21 +4,23 @@
 #include "param.h"
 #include "stat.h"
 #include "x86.h"
-#include "new-urcu.h"
+#include "rcu.h"
 
 #undef NULL
 #define NULL ((void*)0)
 
 #define PGSIZE (4096)
 
-#define MAX_BUCKETS (2000)
+#define MAX_BUCKETS (128)
 #define DEFAULT_BUCKETS                 1
-#define DEFAULT_DURATION                100
+#define DEFAULT_DURATION                1000
 #define DEFAULT_UPDATE                  200
 #define DEFAULT_INITIAL                 32
 #define DEFAULT_NB_THREADS              1
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
+
+struct rcu_maintain rcu_global;
 
 typedef struct node {
     int value;
@@ -27,7 +29,7 @@ typedef struct node {
 
 typedef struct spinlock_list {
     int bucket_id;
-    // lock_t lk;
+    lock_t lk;
     node_t *head;
 } spinlock_list_t;
 
@@ -40,12 +42,16 @@ typedef struct thread_param {
 	int n_buckets;
 	int initial;
 	int nb_threads;
-    int tidx;
     int update;
     int range;
-    int variation;
+    unsigned long variation;
+    unsigned long result_add;
+    unsigned long result_remove;
+    unsigned long result_contains;
+    unsigned long result_found;
     int *stop;
     hash_list_t *p_hash_list;
+    int tidx;
 } thread_param_t;
 
 int list_deletes()
@@ -87,14 +93,17 @@ int list_insert(int key, spinlock_list_t *list)
     node_t *prev, *cur, *new_node;
     int ret=1;
 
-    urcu_writer_lock(list->bucket_id);
+	new_node = (node_t*)th_malloc(sizeof(node_t));
+
+	lock_acquire(&list->lk);
 
     if(list->head == NULL)
     {
-        new_node = (node_t*)malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
         list->head = new_node;
+		lock_release(&list->lk);
+		return ret;
     }
     else
     {
@@ -106,30 +115,34 @@ int list_insert(int key, spinlock_list_t *list)
                 ret = 0;
                 break;
             }
+            // sleep(0);
         }
     }
 
     if(ret){
         //no node with key value
-        new_node = (node_t *)malloc(sizeof(node_t));
         new_node->next = NULL;
         new_node->value = key;
-        prev->next = new_node;
-        // printf(1, "insert_node value : %d\tpid : %d\n", key, getpid());
+		do {prev->next = new_node;
+		  __sync_synchronize();
+		} while(0);
+		lock_release(&list->lk);
     }
     else{
-        // printf(1, "node exist value : %d\tpid : %d\n", key, getpid());
+	  lock_release(&list->lk);
+	  th_free(new_node);
     }
-    urcu_writer_unlock(list->bucket_id);
 
     return ret;
 }
 
-int list_delete(int key, spinlock_list_t *list)
+int list_delete(int key, spinlock_list_t *list, struct rcu_data *d)
 {
     node_t *prev, *cur;
     int ret = 0;
-    urcu_writer_lock(list->bucket_id);
+
+	lock_acquire(&list->lk);
+
     if(list->head == NULL){
         return ret;
     }
@@ -149,31 +162,30 @@ int list_delete(int key, spinlock_list_t *list)
     {
         //node to delete with key value
         prev->next = cur->next;
-        free(cur);
-        // printf(1, "delete node value : %d\tpid : %d\n", key, getpid());
+		lock_release(&list->lk);
+		rcu_synchronize(&rcu_global, d);
+        th_free(cur);
     }
     else{
-        // printf(1, "nothing to delete %d\t pid : %d\n", key, getpid());
+		lock_release(&list->lk);
     }
-    urcu_writer_unlock(list->bucket_id);
 
     return ret;
 }
 
-int list_find(int key, spinlock_list_t *list, int tidx)
+int list_find(int key, spinlock_list_t *list, struct rcu_data *d)
 {
     node_t *prev, *cur;
     int ret, val;
 
-    urcu_reader_lock(tidx);
+	rcu_reader_lock(&rcu_global, d);
     for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
         if ((val = cur->value) >= key)
             break;
         ret = (val == key);
-        // printf(1, "ret: %d\n", ret);
     }
-    urcu_reader_unlock(tidx);
+	rcu_reader_unlock(&rcu_global, d);
 
     return ret;
 }
@@ -182,13 +194,13 @@ void test(void* param)
 {
     int op, bucket, value;
     value = 1;//sys_uptime();
+	struct rcu_data self;
 
     thread_param_t *p_data = (thread_param_t*)param; 
     hash_list_t *p_hash_list = p_data->p_hash_list;
+	self.id = p_data->tidx;
 
-    urcu_register(p_data->tidx);
-
-    while (*p_data->stop == 0)
+    while (*(p_data->stop) == 0)
     {
         op = randomrange(1, 1000);
         value = randomrange(1, p_data->range);
@@ -203,23 +215,27 @@ void test(void* param)
                 {
                     p_data->variation++;
                 }
+                p_data->result_add++;
             }
             else
             {
-                if (list_delete(value, p_list))
+			    if (list_delete(value, p_list, &self))
                 {
                     p_data->variation--;
                 }
+                p_data->result_remove++;
             }
         }
         else
         {
-            list_find(value, p_list, p_data->tidx);
+            if(list_find(value, p_list, &self))
+            {
+                p_data->result_contains++;
+            }
+            p_data->result_found++;
         }
-        sleep(1);
     }
 
-    urcu_unregister(p_data->tidx);
     printf(1, "thread %d end\n", getpid());
     exit();
 }
@@ -230,7 +246,9 @@ int main(int argc, char **argv)
     hash_list_t *p_hash_list;
     int *thread_list;
     int stop = 0, initial_time = 0;
-    int total_variation = 0, total_size = 0;
+    unsigned long exp = 0, total_variation = 0, total_size = 0;
+    unsigned long reads = 0, updates = 0;
+    unsigned long iv = 0, fv = 0;
 
 	int n_buckets = DEFAULT_BUCKETS;
 	int initial = DEFAULT_INITIAL;
@@ -269,8 +287,8 @@ int main(int argc, char **argv)
 	assert(duration >= 0);
 	assert(initial >= 0);
 	assert(nb_threads > 0);
-   	assert(update > 0);
-	assert(range > 0);
+	assert(update >= 0 && update <= 1000);
+	assert(range > 0 && range >= initial);
 
     p_hash_list = (hash_list_t *)malloc(sizeof(hash_list_t));
     if (p_hash_list == NULL) {
@@ -288,6 +306,7 @@ int main(int argc, char **argv)
         }
         list->head = NULL;
         list->bucket_id = i;
+		lock_init(&list->lk);
         p_hash_list->buckets[i] = list;
     }
 
@@ -310,7 +329,7 @@ int main(int argc, char **argv)
         printf(1,"thread_list init error\n");
         exit();
     }
-    urcu_init(nb_threads);
+    rcu_init(&rcu_global, nb_threads);
 
     param_list = (thread_param_t *)malloc(nb_threads*sizeof(thread_param_t));
     if (param_list == NULL) {
@@ -338,24 +357,32 @@ int main(int argc, char **argv)
 
     while(1)
     {
-        if(uptime() - initial_time > duration)
+        if(uptime() - initial_time > duration / 10)
         {
-            printf(1, "elapsed time: %dms\n", uptime() - initial_time);
             stop = 1;
+            printf(1, "elapsed time: %dms\n", (uptime() - initial_time) * 10);
             break;
         }
-        sleep(1);
     }
-    
+
+    printf(1,"join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         thread_join();
     }
+    printf(1," done!\n");
 
-    for(int i = 0; i < nb_threads; i++)
-    {
-        total_variation += param_list[i].variation;
-    }
+    printf(1, "\n####result####\n");
+	for (int i = 0; i < nb_threads; i++) {
+		printf(1, "Thread %d\n", i);
+		printf(1, "  #add        : %d\n", param_list[i].result_add);
+		printf(1, "  #remove     : %d\n", param_list[i].result_remove);
+		printf(1, "  #contains   : %d\n", param_list[i].result_contains);
+		printf(1, "  #found      : %d\n", param_list[i].result_found);
+		reads += param_list[i].result_contains;
+		updates += (param_list[i].result_add + param_list[i].result_remove);
+		total_variation += param_list[i].variation;
+	}
 
     total_size = 0;
     for(int i = 0; i < n_buckets; i++)
@@ -367,11 +394,24 @@ int main(int argc, char **argv)
             total_size++;
         }
     }
-    int exp = initial + total_variation;
+    exp = initial + total_variation;
+
+    printf(1, "Set size      : %d (expected: %d)\n", total_size, exp);
+    printf(1, "Duration      : %d (ms)\n", duration);
+    iv = (reads + updates) * 1000.0 / duration;
+    fv = (int)((reads + updates) * 1000.0 / duration * 10) % 10;
+    printf(1, "#ops          : %d (%d.%d / s)\n", reads + updates, iv, fv);
+    iv = reads * 1000.0 / duration;
+    fv = (int)(reads * 1000.0 / duration * 10) % 10;
+    printf(1, "#read ops     : %d (%d.%d / s)\n", reads, iv, fv);
+    iv = updates * 1000.0 / duration;
+    fv = (int)(updates * 1000.0 / duration * 10) % 10;
+    printf(1, "#update ops   : %d (%d.%d / s)\n", updates, iv, fv);
+
     if(exp != total_size)
     {
 		printf(1,"\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", exp, total_size);
     }
-    printf(1, "bench_list end\n");
+    printf(1, "benchlist_rcu end\n");
     exit();
 }

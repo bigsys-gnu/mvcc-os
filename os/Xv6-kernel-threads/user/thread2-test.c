@@ -25,16 +25,19 @@ main(int argc, char *argv[])
 {
    ppid = getpid();
 
-   int i, thread_pid, join_pid;
-   for(i = 0; i < 2000; i++) {
+   int i, thread_pid;
+   for(i = 0; i < 30; i++) {
       global = 1;
       thread_pid = thread_create(worker, 0);
       assert(thread_pid > 0);
-      join_pid = thread_join();
-      assert(join_pid == thread_pid);
-      assert(global == 5);
       assert((uint)sbrk(0) < (150 * 4096) && "shouldn't even come close");
    }
+
+   for (i = 0; i < 30; ++i)
+	 {
+	   thread_join();
+	 }
+
 
    printf(1, "TEST PASSED\n");
    exit();

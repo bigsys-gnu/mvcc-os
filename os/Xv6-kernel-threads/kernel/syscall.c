@@ -106,6 +106,12 @@ static int (*syscalls[])(void) = {
 [SYS_join]    sys_join,
 [SYS_write]   sys_write,
 [SYS_uptime]  sys_uptime,
+[SYS_rcu_init]  sys_rcu_init,
+[SYS_rcu_reader_lock]  sys_rcu_reader_lock,
+[SYS_rcu_reader_unlock]  sys_rcu_reader_unlock,
+[SYS_rcu_synchronize]  sys_rcu_synchronize,
+[SYS_rcu_register]  sys_rcu_register,
+[SYS_rcu_unregister]  sys_rcu_unregister,
 };
 
 // Called on a syscall trap. Checks that the syscall number (passed via eax)
