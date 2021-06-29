@@ -4,11 +4,22 @@
 #include "types.h"
 
 struct stat;
+struct rcu_data;
+struct rcu_maintain;
 typedef struct __lock_t{
 	uint flag;
 }lock_t;
 
+#define assert(x) if (x) {} else { \
+   printf(1, "%s: %d ", __FILE__, __LINE__); \
+   printf(1, "assert failed (%s)\n", # x); \
+   printf(1, "TEST FAILED\n"); \
+   kill(getpid());			   \
+   exit(); \
+}
+
 // system calls
+void* malloc(uint);
 int clone(void(*fcn)(void*), void*, void*);
 int fork(void);
 int exit(void) __attribute__((noreturn));
@@ -32,6 +43,7 @@ int getpid(void);
 char* sbrk(int);
 int sleep(int);
 int uptime(void);
+int bench(void);
 
 // user library functions (ulib.c)
 int stat(char*, struct stat*);
@@ -52,6 +64,16 @@ int thread_join();
 int lock_init(lock_t *lk);
 void lock_acquire(lock_t *lk);
 void lock_release(lock_t *lk);
+void * th_malloc(uint size);
+void th_free(void *tr);
+
+// rcu syscall
+int rcu_init(struct rcu_maintain *rm, int num_threads);
+int rcu_reader_lock(struct rcu_maintain *rm, struct rcu_data *d);
+int rcu_reader_unlock(struct rcu_maintain *rm, struct rcu_data *d);
+int rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d);
+int rcu_register(struct rcu_maintain *rm, struct rcu_data *d);
+int rcu_unregister(struct rcu_data *d);
 
 #endif // _USER_H_
 
