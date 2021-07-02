@@ -41,6 +41,7 @@ class strbuf {
 
 #ifdef XV6_KERNEL
 namespace std {
+#if 0
   struct ostream { int next_width; };
   extern ostream cout;
 
@@ -89,6 +90,7 @@ namespace std {
     s.next_width = sw._n;
     return s;
   }
+#endif
 }
 #endif
 
