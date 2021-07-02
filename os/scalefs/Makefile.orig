@@ -52,13 +52,13 @@ ifdef USE_CLANG
 CC  = $(TOOLPREFIX)clang
 CXX = $(TOOLPREFIX)clang++ 
 CXXFLAGS = -Wno-delete-non-virtual-dtor -Wno-gnu-designator -Wno-tautological-compare -Wno-unused-private-field
-CFLAGS   = -no-integrated-as -fno-pie
+CFLAGS   = -no-integrated-as
 ASFLAGS  = 
 else
 CC  ?= $(TOOLPREFIX)gcc
 CXX ?= $(TOOLPREFIX)g++
 CXXFLAGS = -Wno-delete-non-virtual-dtor
-CFLAGS   = -fno-pie
+CFLAGS   =
 ASFLAGS  = -Wa,--divide
 endif
 
@@ -70,11 +70,8 @@ STRIP = $(TOOLPREFIX)strip
 ifeq ($(PLATFORM),xv6)
 INCLUDES  = --sysroot=$(O)/sysroot \
 	-iquote include -iquote$(O)/include \
-    -iquote libutil/include \
-    -Ithird_party/lwip/src/include -Ithird_party/lwip/src/include/ipv4 -Ithird_party/libcxx/include \
-    -Ithird_party/acpica/source/include -Ithird_party/musl/include -nostdinc -Ithird_party/musl/arch/x86_64 \
-    -Ithird_party/musl/arch/generic -Ithird_party/libunwind/include \
-	$(CODEXINC) -I$(MTRACESRC) \
+	-iquote libutil/include \
+	-Istdinc $(CODEXINC) -I$(MTRACESRC) \
 	-include param.h -include libutil/include/compiler.h
 COMFLAGS  = -static -DXV6_HW=$(HW) -DXV6 \
 	    -fno-builtin -fno-strict-aliasing -fno-omit-frame-pointer -fms-extensions \
@@ -103,7 +100,7 @@ ifeq ($(EXCEPTIONS),y)
 	  $(shell $(CC) -print-file-name=libsupc++.a)
   CXXFLAGS += -DEXCEPTIONS=1
   ifndef USE_CLANG
-    CXXFLAGS += -fnothrow-opt -Wnoexcept -fno-pie
+    CXXFLAGS += -fnothrow-opt -Wnoexcept
   endif
 else
   CXXRUNTIME =
