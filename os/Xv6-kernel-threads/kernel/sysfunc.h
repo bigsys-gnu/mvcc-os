@@ -25,5 +25,10 @@ int sys_unlink(void);
 int sys_wait(void);
 int sys_write(void);
 int sys_uptime(void);
-
+int sys_rcu_init(void);
+int sys_rcu_reader_lock(void);
+int sys_rcu_reader_unlock(void);
+int sys_rcu_synchronize(void);
+int sys_rcu_register(void);
+int sys_rcu_unregister(void);
 #endif // _SYSFUNC_H_

@@ -25,5 +25,11 @@
 #define SYS_uptime 21
 #define SYS_clone  22
 #define SYS_join   23
+#define SYS_rcu_init   24
+#define SYS_rcu_reader_lock   25
+#define SYS_rcu_reader_unlock   26
+#define SYS_rcu_synchronize   27
+#define SYS_rcu_register   28
+#define SYS_rcu_unregister   29
 
 #endif // _SYSCALL_H_

@@ -4,7 +4,6 @@
 #include "param.h"
 #include "stat.h"
 #include "x86.h"
-#include "new-urcu.h"
 
 #undef NULL
 #define NULL ((void *)0)
@@ -232,13 +231,3 @@ int main()
 
     exit();
 }
-
-
-
-
-
-
-
-
-
-
