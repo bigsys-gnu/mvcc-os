@@ -1,0 +1,146 @@
+# -*- makefile-gmake -*-
+
+#libunwind
+LIBUNWIND_SRC = third_party/libunwind/src
+LIBUNWIND_OBJ = $(O)/libunwind
+LIBUNWIND_SRC_C_FILES := $(wildcard $(LIBUNWIND_SRC)/*.c)
+LIBUNWIND_SRC_CXX_FILES := $(wildcard $(LIBUNWIND_SRC)/*.cpp)
+LIBUNWIND_SRC_S_FILES := $(wildcard $(LIBUNWIND_SRC)/*.S)
+LIBUNWIND_OBJ_FILES := $(patsubst $(LIBUNWIND_SRC)/%.c,$(LIBUNWIND_OBJ)/%.o,$(LIBUNWIND_SRC_C_FILES)) \
+						$(patsubst $(LIBUNWIND_SRC)/%.cpp,$(LIBUNWIND_OBJ)/%.o,$(LIBUNWIND_SRC_CXX_FILES)) \
+						$(patsubst $(LIBUNWIND_SRC)/%.S,$(LIBUNWIND_OBJ)/%.o,$(LIBUNWIND_SRC_S_FILES))
+LIBUNWIND_FLAGS = -D_LIBUNWIND_IS_BAREMETAL -D_LIBUNWIND_HAS_NO_THREADS -DNDEBUG -Ithird_party/libunwind/include -msse
+$(LIBUNWIND_OBJ)/%.o: $(LIBUNWIND_SRC)/%.cpp
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CXX) $(CXXFLAGS) $(LIBUNWIND_FLAGS) -c -o $@ $<
+$(LIBUNWIND_OBJ)/%.o: $(LIBUNWIND_SRC)/%.c
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(LIBUNWIND_FLAGS) -c -o $@ $<
+$(LIBUNWIND_OBJ)/%.o: $(LIBUNWIND_SRC)/%.S
+	@echo "  CC     $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(ASFLAGS) -c -o $@ $<
+$(O)/libunwind.a: $(LIBUNWIND_OBJ_FILES)
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+#libcxxabi
+LIBCXXABI_SRC = third_party/libcxxabi/src
+LIBCXXABI_OBJ = $(O)/libcxxabi
+LIBCXXABI_SRC_C_FILES := $(wildcard $(LIBCXXABI_SRC)/*.c)
+LIBCXXABI_SRC_CXX_FILES := $(wildcard $(LIBCXXABI_SRC)/*.cpp)
+LIBCXXABI_OBJ_FILES := $(patsubst $(LIBCXXABI_SRC)/%.c,$(LIBCXXABI_OBJ)/%.o,$(LIBCXXABI_SRC_C_FILES)) \
+						$(patsubst $(LIBCXXABI_SRC)/%.cpp,$(LIBCXXABI_OBJ)/%.o,$(LIBCXXABI_SRC_CXX_FILES))
+LIBCXXABI_FLAGS = -D_NOEXCEPT=noexcept -DLIBCXXABI_USE_LLVM_UNWINDER -Ithird_party/libcxx/include -Ithird_party/libcxxabi/include
+$(LIBCXXABI_OBJ)/%.o: $(LIBCXXABI_SRC)/%.cpp
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CXX) $(LIBCXXABI_FLAGS) $(CXXFLAGS) -c -o $@ $<
+$(LIBCXXABI_OBJ)/%.o: $(LIBCXXABI_SRC)/%.c
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(LIBCXXABI_FLAGS) -c -o $@ $<
+$(O)/libcxxabi.a: $(LIBCXXABI_OBJ_FILES)
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+#libcxx
+LIBCXX_SRC = third_party/libcxx/src
+LIBCXX_OBJ = $(O)/libcxx
+LIBCXX_SRC_C_FILES := $(wildcard $(LIBCXX_SRC)/*.c)
+LIBCXX_SRC_CXX_FILES := $(wildcard $(LIBCXX_SRC)/*.cpp)
+LIBCXX_OBJ_FILES := $(patsubst $(LIBCXX_SRC)/%.c,$(LIBCXX_OBJ)/%.o,$(LIBCXX_SRC_C_FILES)) \
+						$(patsubst $(LIBCXX_SRC)/%.cpp,$(LIBCXX_OBJ)/%.o,$(LIBCXX_SRC_CXX_FILES))
+LIBCXX_FLAGS = -D_NOEXCEPT=noexcept -D_LIBCPP_BUILDING_LIBRARY \
+	-D_LIBCPP_PROVIDES_DEFAULT_RUNE_TABLE -Ithird_party/libcxx/include -msse
+$(LIBCXX_OBJ)/%.o: $(LIBCXX_SRC)/%.cpp
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CXX) $(CXXFLAGS) $(LIBCXX_FLAGS) -c -o $@ $<
+$(LIBCXX_OBJ)/%.o: $(LIBCXX_SRC)/%.c
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(LIBCXX_FLAGS) -c -o $@ $<
+$(O)/libcxx.a: $(LIBCXX_OBJ_FILES)
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+
+#compiler-rt
+COMPILERRT_SRC = third_party/compiler-rt/lib/builtins
+COMPILERRT_OBJ = $(O)/compiler-rt
+COMPILERRT_SRC_C_FILES := $(wildcard $(COMPILERRT_SRC)/*.c)
+COMPILERRT_SRC_CXX_FILES := $(wildcard $(COMPILERRT_SRC)/*.cpp)
+COMPILERRT_OBJ_FILES := $(patsubst $(COMPILERRT_SRC)/%.c,$(COMPILERRT_OBJ)/%.o,$(COMPILERRT_SRC_C_FILES)) \
+						$(patsubst $(COMPILERRT_SRC)/%.cpp,$(COMPILERRT_OBJ)/%.o,$(COMPILERRT_SRC_CXX_FILES))
+COMPILERRT_FLAGS = -Ithird_party/libcxx/include -msse
+$(COMPILERRT_OBJ)/%.o: $(COMPILERRT_SRC)/%.cpp
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CXX) $(COMPILERRT_FLAGS) $(CXXFLAGS) -c -o $@ $<
+$(COMPILERRT_OBJ)/%.o: $(COMPILERRT_SRC)/%.c
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(COMPILERRT_FLAGS) -c -o $@ $<
+$(O)/compiler-rt.a: $(COMPILERRT_OBJ_FILES)
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+#lwip
+LWIP_SRC = third_party/lwip/src
+LWIP_OBJ = $(O)/lwip
+LWIP_SRC_C_FILES := $(wildcard $(LWIP_SRC)/*/*.c) $(wildcard $(LWIP_SRC)/core/ipv4/*.c)
+LWIP_OBJ_FILES := $(patsubst $(LWIP_SRC)/%.c,$(LWIP_OBJ)/%.o,$(LWIP_SRC_C_FILES))
+LWIP_FLAGS = -Wno-attributes -Wno-address -Wno-char-subscripts -Wno-format -O2 \
+	-Ithird_party/lwip/src/include -Ithird_party/lwip/src/include/ipv4 -Inet -Inet/arch \
+	-mcmodel=kernel -Ithird_party/libcxx/include -DXV6_KERNEL -mno-sse
+$(LWIP_OBJ)/%.o: $(LWIP_SRC)/%.c
+	@echo "  CXX    $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(LWIP_FLAGS) -c -o $@ $<
+$(O)/liblwip.a: $(LWIP_OBJ_FILES) $(O)/net/sys_arch.o $(O)/net/if.o
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+#zlib
+ZLIB_SRC = third_party/zlib
+ZLIB_OBJ = $(O)/zlib
+ZLIB_SRC_C_FILES := $(wildcard $(ZLIB_SRC)/*.c)
+ZLIB_OBJ_FILES := $(patsubst $(ZLIB_SRC)/%.c,$(ZLIB_OBJ)/%.o,$(ZLIB_SRC_C_FILES))
+ZLIB_FLAGS = -Wno-attributes -Wno-address -Wno-char-subscripts -Wno-format -O2 \
+	-Ithird_party/zlib/ -mcmodel=kernel -Ithird_party/libcxx/include -DXV6_KERNEL -mno-sse
+$(ZLIB_OBJ)/%.o: $(ZLIB_SRC)/%.c
+	@echo "  CC     $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(ZLIB_FLAGS) -c -o $@ $<
+$(O)/libzlib.a: $(ZLIB_OBJ_FILES)
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+#acpica
+ACPICA_SRC = third_party/acpica/source/components
+ACPICA_OBJ = $(O)/acpica
+ACPICA_SRC_C_FILES := $(wildcard $(ACPICA_SRC)/*/*.c)
+ACPICA_OBJ_FILES := $(patsubst $(ACPICA_SRC)/%.c,$(ACPICA_OBJ)/%.o,$(ACPICA_SRC_C_FILES))
+ACPICA_FLAGS = -O2 -mcmodel=kernel -Ithird_party/libcxx/include -mno-sse
+ACPICA_ACENV = third_party/acpica/source/include/platform/acenv.h
+
+$(ACPICA_OBJ)/%.o: $(ACPICA_SRC)/%.c $(ACPICA_ACENV)
+	@echo "  CC     $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(CFLAGS) $(ACPICA_FLAGS) -c -o $@ $<
+$(O)/libacpica.a: $(ACPICA_OBJ_FILES)
+	@echo "  AR     $@"
+	$(Q)$(AR) rcs $@ $^
+
+# ACPICA's source tree is *almost* but not quite designed to be used
+# completely untouched.  Unfortunately, acenv.h hard-codes the various
+# platforms, so wedge xv6 in.
+$(ACPICA_ACENV): $(ACPICA_ACENV).gen
+	@echo "  TWEAK  $@"
+	$(Q)cp $< $@
+$(ACPICA_ACENV).gen:
+	$(Q)sed 's/#if \(defined(_LINUX)\)/#if defined(XV6)\n#include "acpica-xv6.h"\n#elif \1/' $(ACPICA_ACENV) > $@.tmp
+	$(Q)cmp $@.tmp $@ || mv $@.tmp $@
