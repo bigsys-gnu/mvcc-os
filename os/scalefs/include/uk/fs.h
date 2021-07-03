@@ -5,6 +5,7 @@
 #define T_FILE 010   // File
 #define T_DEV  006   // Special device
 #define T_FIFO 001   // Pipe
+#define T_SOCKET 007 // Named socket (specified with scalefs)
 
 #ifdef XV6_USER
 struct iovec {
