@@ -10,7 +10,7 @@
 #include "semaphore.hh"
 #include "mfs.hh"
 #include "sleeplock.hh"
-#include <uk/unistd.h>
+#include "uk/unistd.h"
 
 class dir_entries;
 

@@ -4,7 +4,7 @@
 #include "condvar.hh"
 #include "fs.h"
 #include "file.hh"
-#include <uk/stat.h>
+#include "uk/stat.h"
 #include "net.hh"
 
 struct devsw __mpalign__ devsw[NDEV];

@@ -5,7 +5,7 @@
 #include "condvar.hh"
 #include "proc.hh"
 #include "amd64.h"
-#include <uk/stat.h>
+#include "uk/stat.h"
 #include "fs.h"
 #include "file.hh"
 #include "vm.hh"
@@ -15,6 +15,7 @@
 #include "mfs.hh"
 #include "work.hh"
 #include "filetable.hh"
+#include "string.h"
 
 #define BRK (USERTOP >> 1)
 

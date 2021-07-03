@@ -1,8 +1,8 @@
 // User/kernel shared stat definitions
 #pragma once
 
-#include <uk/fs.h>
-#include <uk/time.h>
+#include "fs.h"
+#include "time.h"
 
 struct kernel_stat {
   dev_t st_dev;                 /* Device number */
