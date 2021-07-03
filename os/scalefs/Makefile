@@ -89,7 +89,7 @@ LDFLAGS := -pthread
 endif
 COMFLAGS += -g -MD -MP -O3 -Wall -Werror -DHW_$(HW) $(INCLUDES)
 CFLAGS   := $(COMFLAGS) -std=c99 $(CFLAGS)
-CXXFLAGS := $(COMFLAGS) -std=c++14 -Wno-sign-compare $(CXXFLAGS)
+CXXFLAGS := $(COMFLAGS) -std=c++2a -Wno-sign-compare $(CXXFLAGS)
 ASFLAGS  := $(ASFLAGS) -Iinclude -I$(O)/include -m64 -gdwarf-2 -MD -MP -DHW_$(HW) -include param.h
 
 ifeq ($(EXCEPTIONS),y)
