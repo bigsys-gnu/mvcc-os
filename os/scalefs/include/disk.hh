@@ -3,7 +3,8 @@
 #include "spinlock.hh"
 #include "condvar.hh"
 
-#define IOV_MAX     65535    // Limited by MAX_PRD_ENTRIES
+/* temporally comment out of IOV_MAX to avoid redefinition err */
+//#define IOV_MAX     65535    // Limited by MAX_PRD_ENTRIES
 #define SG_IO_SIZE  64*1024  // Size used for scatter-gather I/O
 
 struct kiovec

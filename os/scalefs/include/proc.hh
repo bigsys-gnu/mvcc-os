@@ -5,7 +5,7 @@
 #include "cpputil.hh"
 #include "fs.h"
 #include "sched.hh"
-#include <uk/signal.h>
+#include "uk/signal.h"
 #include "ilist.hh"
 #include <stdexcept>
 #include "vmalloc.hh"
