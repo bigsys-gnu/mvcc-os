@@ -71,7 +71,7 @@ ifeq ($(PLATFORM),xv6)
 INCLUDES  = --sysroot=$(O)/sysroot \
 	-iquote include -iquote$(O)/include \
     -iquote libutil/include \
-    -Ithird_party/lwip/src/include -Ithird_party/lwip/src/include/ipv4 -Ithird_party/libcxx/include \
+    -Ithird_party/lwip/src/include -Inet -Ithird_party/lwip/src/include/ipv4 -Ithird_party/libcxx/include \
     -Ithird_party/acpica/source/include -Ithird_party/musl/include -nostdinc -Ithird_party/musl/arch/x86_64 \
     -Ithird_party/musl/arch/generic -Ithird_party/libunwind/include \
 	$(CODEXINC) -I$(MTRACESRC) \
@@ -89,7 +89,7 @@ LDFLAGS := -pthread
 endif
 COMFLAGS += -g -MD -MP -O3 -Wall -DHW_$(HW) $(INCLUDES)
 CFLAGS   := $(COMFLAGS) -std=c99 $(CFLAGS)
-CXXFLAGS := $(COMFLAGS) -std=c++2a -Wno-sign-compare $(CXXFLAGS)
+CXXFLAGS := $(COMFLAGS) -std=c++17 -Wno-sign-compare $(CXXFLAGS)
 ASFLAGS  := $(ASFLAGS) -Iinclude -I$(O)/include -m64 -gdwarf-2 -MD -MP -DHW_$(HW) -include param.h
 
 ifeq ($(EXCEPTIONS),y)
@@ -168,7 +168,7 @@ $(O)/%.o: $(O)/%.S
 $(O)/sysroot: include/host_hdrs.hh
 	rm -rf $@.tmp $@
 	mkdir -p $@.tmp
-	tar c $$($(CXX) -E -H -std=c++2a -ffreestanding $< -o /dev/null 2>&1 \
+	tar c $$($(CXX) -E -H -std=c++17 -ffreestanding $< -o /dev/null 2>&1 \
 		| awk '/^[.]/ {print $$2}') | tar xC $@.tmp
 	mv $@.tmp $@
 

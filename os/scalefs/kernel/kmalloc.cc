@@ -18,6 +18,7 @@
 #include "numa.hh"
 
 #include <type_traits>
+#include "string.h"
 
 // allocate in power-of-two sizes up to 2^KMMAX (PGSIZE)
 #define KMMAX PGSHIFT

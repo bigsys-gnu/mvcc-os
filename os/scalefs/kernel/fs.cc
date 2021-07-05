@@ -27,7 +27,7 @@
  */
 
 #include "types.h"
-#include <uk/stat.h>
+#include "uk/stat.h"
 #include "mmu.h"
 #include "kernel.hh"
 #include "spinlock.hh"
@@ -178,7 +178,7 @@ balloc_free_on_disk(std::vector<u32>& blocks, transaction *trans, bool alloc)
           panic("balloc_free_on_disk: block %d already free", *bno);
         locked->data[bi/8] &= ~m;
       }
-    } while (++bno && bno != blocks.end() && *bno <= max_bno);
+    } while (*(++bno) && bno != blocks.end() && *bno <= max_bno);
 
     bp->add_to_transaction(trans);
   }
