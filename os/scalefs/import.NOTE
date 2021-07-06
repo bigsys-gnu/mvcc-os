@@ -1,0 +1,12 @@
+ Note for importing scalefs to mvcc-os
+
+ * General approach
+  - Sv6 and Scalefs are not compiled on up-to-date ubuntu os but Ward which is based on sv6 works
+
+ 1) Makefile
+  - change include paths
+  - change c++ version to c++17
+
+
+ 2) copy thirdparty header
+  - copied from ward which is a research os based on sv6
