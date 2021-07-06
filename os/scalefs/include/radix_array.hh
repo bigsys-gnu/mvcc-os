@@ -13,10 +13,16 @@
 #define RADIX_DEBUG 1
 #endif
 
-namespace std {
-  /** @internal Prototype standard allocator template. */
-  template <class T> class allocator;
-}
+#ifdef XV6_KERNEL
+void cprintf(const char*, ...) __attribute__((format(printf, 1, 2)));
+#else
+void cprintf(const char*, ...) {}
+#endif
+
+// namespace std {
+//   /** @internal Prototype standard allocator template. */
+//   template <class T> class allocator;
+// }
 
 /**
  * An allocator that adapts a regular Allocator class to the
@@ -166,6 +172,7 @@ private:
   struct node_ptr;
   struct upper_node;
   struct leaf_node;
+  struct external_node;
 
   static constexpr std::size_t
   log2_exact(std::size_t x, std::size_t accum = 0)
@@ -184,12 +191,11 @@ private:
     UPPER_FANOUT = NodeBytes / sizeof(node_ptr),
     /** Number of slots in a leaf node. */
     LEAF_FANOUT  = NodeBytes / round_up_to_pow2_const(sizeof(T)),
+    /** Number of bits to index into an upper node */
+    UPPER_BITS = log2_exact(UPPER_FANOUT),
+    /** Number of bits to index into a leaf node */
+    LEAF_BITS = log2_exact(LEAF_FANOUT),
   };
-
-  // Work around a bug in GCC 4.6 (fixed in 4.7) where log2 can't be
-  // used in an enum.
-  static constexpr std::size_t UPPER_BITS = log2_exact(UPPER_FANOUT);
-  static constexpr std::size_t LEAF_BITS = log2_exact(LEAF_FANOUT);
 
   static_assert(UPPER_BITS != ~0, "NodeBytes must be a power of 2");
   static_assert(LEAF_BITS != ~0, "LEAF_FANOUT not a power of 2?!");
@@ -215,6 +221,12 @@ private:
     return (key_type)1 << key_shift(level);
   }
 
+  static constexpr key_type
+  level_mask(unsigned level)
+  {
+    return level_span(level) - 1;
+  }
+
   static constexpr unsigned
   num_levels(unsigned level = 0)
   {
@@ -224,7 +236,7 @@ private:
   /**
    * Number of levels (both upper and leaf).
    */
-  static constexpr unsigned LEVELS = num_levels();
+  static constexpr unsigned LEVELS = num_levels(0);
 
   static constexpr size_t
   level_fanout(unsigned level)
@@ -251,6 +263,13 @@ public:
   constexpr radix_array() noexcept : root_(0) { }
 
   /**
+   * Construct an empty radix array with a dedicated allocator.
+   */
+  template<class U> radix_array(U alloc_arg) noexcept :
+    upper_node_alloc_(alloc_arg), leaf_node_alloc_(alloc_arg), external_node_alloc_(alloc_arg),
+    root_(0) { }
+
+  /**
    * Destruct all set elements and free backing memory.
    */
   ~radix_array()
@@ -273,8 +292,9 @@ public:
   radix_array &operator=(radix_array &&o) noexcept
   {
     node_ptr(root_).free(this);
-    root_ = o.root_;
+    root_ = o.root_.load();
     o.root_ = 0;
+    return *this;
   }
 
   /**
@@ -429,7 +449,7 @@ public:
           // Free the old node if it was an external
           if (orig_child.is_external())
             // XXX This isn't safe without RCU
-            delete orig_child.as_external();
+            orig_child.as_external()->free(r_);
         } else {
           // CAS failed.  Free new node and try again.
           if (node_level_ > 1) {
@@ -456,8 +476,8 @@ public:
      * in node to the value x.  If @c unset is true, then this should
      * unset the values.
      */
-    static void set_recursive(node_ptr node, unsigned level, std::size_t idx,
-                              std::size_t len, value_type *x, bool unset)
+    void set_recursive(node_ptr node, unsigned level, std::size_t idx,
+                       std::size_t len, value_type *x, bool unset) const
     {
       // We require some form of mutual exclusion for overlapping
       // modification operations; since set_recursive is called
@@ -490,20 +510,20 @@ public:
             // there's nothing to do.
             if (!unset)
               // XXX Use allocator?
-              upper->child[i] = node_ptr(new value_type(*x),
+              upper->child[i] = node_ptr(external_node::create(r_, *x),
                                          child.get_lock().is_locked());
           } else if (child.is_external()) {
             // Assign to the existing external.  If we're removing,
             // then delete the external
-            value_type *ext = child.as_external();
+            external_node *ext = child.as_external();
             if (!unset) {
               // The lock bit is maintained on the pointer, so we
               // don't have to worry about maintaining it here.
-              *ext = *x;
+              ext->value = *x;
             } else {
               upper->child[i] = node_ptr(nullptr, child.get_lock().is_locked());
               // XXX This isn't safe without RCU
-              delete ext;
+              ext->free(r_);
             }
           } else {
             // Recurse into the pointed-to node
@@ -603,7 +623,7 @@ public:
         // reach a terminal child.
         node_ptr c(node_.as_upper_node()->child[subkey(k_, node_level_)]);
         if (c.is_external())
-          return *c.as_external();
+          return c.as_external()->value;
         else if (c.is_null())
           throw std::out_of_range("value is not set");
         else
@@ -884,6 +904,76 @@ public:
   }
 
   /**
+   * low and high must fall inside node
+   *
+   */
+  void
+  fill_recursive(node_ptr node, unsigned level, key_type base, key_type low, key_type high, const T &x)
+  {
+    // for(int i = 0; i < LEVELS - level; i++)
+    //   cprintf(" ");
+    // cprintf("filling %lx .. %lx\n", low, high);
+
+    if (level == 0) {
+      assert(node.is_leaf());
+      leaf_node* leaf = node.as_leaf_node();
+      for (auto i = low - base; i < high - base; i++) {
+        leaf->child[i] = x;
+      }
+    } else {
+      assert(node.is_upper());
+      key_type span = level_span(level);
+      upper_node* upper = node.as_upper_node();
+
+      for (key_type i = subkey(low, level); i <= subkey(high-1, level); i++) {
+        node_ptr child = upper->child[i].load(std::memory_order_relaxed);
+        key_type child_base = base + i * span;
+
+        bool low_split = child_base < low;
+        bool high_split = child_base + span > high;
+
+        if ((child.is_null() || child.is_external()) && (low_split || high_split)) {
+          node_ptr new_child;
+          if (level > 1) {
+            // Create upper node
+            new_child = node_ptr(upper_node::create(this, child, level-1), false);
+          } else {
+            // Create leaf node
+            new_child = node_ptr(leaf_node::create(this, child), false);
+          }
+          if(child.is_external())
+            child.as_external()->free(this);
+          upper->child[i].store(new_child, std::memory_order_relaxed);
+          child = new_child;
+        }
+
+        if (low_split && high_split) {
+          assert(child.is_upper() || child.is_leaf());
+          fill_recursive(child, level-1, child_base, low, high, x);
+        } else if(low_split) {
+          assert(child.is_upper() || child.is_leaf());
+          fill_recursive(child, level-1, child_base, low, child_base + span, x);
+        } else if (high_split) {
+          assert(child.is_upper() || child.is_leaf());
+          fill_recursive(child, level-1, child_base, child_base, high, x);
+        } else if (child.is_external()) {
+          child.as_external()->value = x;
+        } else {
+          child.free(this);
+          upper->child[i].store(node_ptr(external_node::create(this, x), false), std::memory_order_relaxed);
+        }
+      }
+    }
+  }
+
+  void
+  fill_recursive(const iterator &low, const iterator &high, const T &x)
+  {
+    assert(x.is_set());
+    fill_recursive(get_root_ptr(), LEVELS, 0, low.k_, high.k_, x);
+  }
+
+  /**
    * Copy-assign all values in the range <tt>[low, high)</tt> to @c x.
    *
    * The caller must ensure that this operation will not overlap the
@@ -1087,6 +1177,7 @@ public:
 private:
   typename ZAllocator::template rebind<upper_node>::other upper_node_alloc_;
   typename ZAllocator::template rebind<leaf_node>::other leaf_node_alloc_;
+  typename ZAllocator::template rebind<external_node>::other external_node_alloc_;
 
   /**
    * A discriminated union of a null pointer, an upper node pointer, a
@@ -1132,7 +1223,7 @@ private:
       }
     }
 
-    node_ptr(value_type *ext, bool locked)
+    node_ptr(external_node *ext, bool locked)
       : v(reinterpret_cast<uintptr_t>(ext) | EXTERNAL |
           (locked ? lock_mask : 0))
     {
@@ -1169,6 +1260,16 @@ private:
       return get_type() == NONE;
     }
 
+    bool is_upper() const
+    {
+      return get_type() == UPPER;
+    }
+
+    bool is_leaf() const
+    {
+      return get_type() == LEAF;
+    }
+
     upper_node *as_upper_node() const
     {
       if (RADIX_DEBUG)
@@ -1183,11 +1284,11 @@ private:
       return reinterpret_cast<leaf_node*>(v & ~mask);
     }
 
-    value_type *as_external() const
+    external_node *as_external() const
     {
       if (RADIX_DEBUG)
         assert(get_type() == EXTERNAL);
-      return reinterpret_cast<value_type*>(v & ~mask);
+      return reinterpret_cast<external_node*>(v & ~mask);
     }
 
     void free(radix_array *r)
@@ -1196,7 +1297,7 @@ private:
         assert(!get_lock().is_locked());
       switch (get_type()) {
       case EXTERNAL:
-        delete as_external();
+        as_external()->free(r);
         break;
       case UPPER:
         as_upper_node()->free(r);
@@ -1248,13 +1349,13 @@ private:
         size_t i = 0;
         if (src.is_external()) {
           // Copy to new externals for each child node
-          value_type *orig = src.as_external();
+          value_type *orig = &src.as_external()->value;
           for (; i < fanout; ++i)
             // XXX Use allocator?
             // Relaxed stores are safe because this upper_node will be
             // installed with an atomic operation that will act as a
             // barrier for these writes.
-            child[i].store(node_ptr(new value_type(*orig), is_locked),
+            child[i].store(node_ptr(external_node::create(r, *orig), is_locked),
                            std::memory_order_relaxed);
         } else if (is_locked) {
           // Propagate lock
@@ -1372,7 +1473,7 @@ private:
         try {
           // Copy-construct each child node from the external we're
           // replacing
-          value_type *orig = src.as_external();
+          value_type *orig = &src.as_external()->value;
           for (auto &c : node->child) {
             new (&c) value_type(*orig);
             if (is_locked)
@@ -1397,12 +1498,52 @@ private:
       r->leaf_node_alloc_.deallocate(this, 1);
     }
 
-  /**
-   * In GCC 5.3.1, std::is_trivially_default_constructible<leaf_node>::value
-   * is false unless we drop the "private" modifier here..
-   */
-  // private:
+  private:
     ~leaf_node() = default;
+  };
+
+  struct external_node
+  {
+    T value;
+
+    // Make sure external_node is NodeBytes big, even if sizeof(T) doesn't
+    // divide NodeBytes.
+    char _pad[0] __attribute__((aligned(NodeBytes)));
+
+    /**
+     * Call #create() instead.  If T's default constructor is trivial,
+     * this will also be trivial, allowing the zero-allocator to
+     * optimize it.
+     */
+    external_node() = default;
+    external_node(const external_node &o) = default;
+    external_node(const T& v): value(v) { }
+
+    external_node(external_node &&o) = delete;
+
+    /**
+     * Create a external node using r's allocator.  The node will be
+     * initialized to replace @c src from the parent node.  @c src
+     * must be a null or external pointer.
+     */
+    static external_node *create(radix_array *r, const T& orig)
+    {
+      external_node* node = r->external_node_alloc_.allocate(1);
+      r->external_node_alloc_.construct(node, orig);
+      return node;
+    }
+
+    /**
+     * Free a external node allocated with #create().
+     */
+    void free(radix_array *r)
+    {
+      this->~external_node();
+      r->external_node_alloc_.deallocate(this, 1);
+    }
+
+  private:
+    ~external_node() = default;
   };
 
   /**

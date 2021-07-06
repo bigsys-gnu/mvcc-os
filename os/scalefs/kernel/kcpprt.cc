@@ -10,10 +10,12 @@
 #include "cpu.hh"
 #include "elf.hh"
 #include "atomic_util.hh"
-#include "heapprof.hh"
-#include "page_info.hh"
+#include "errno.h"
 
-const std::nothrow_t std::nothrow;
+// const std::nothrow_t std::nothrow;
+
+void* stdout = nullptr;
+void* stderr = nullptr;
 
 void*
 operator new(std::size_t nbytes)
@@ -25,8 +27,20 @@ operator new(std::size_t nbytes)
   return x+1;
 }
 
+void*
+operator new(std::size_t nbytes, std::align_val_t al)
+{
+  size_t alignment = (size_t)al;
+  if(alignment < sizeof(u64))
+    alignment = sizeof(u64);
+
+  char* x = (char*)kmalloc(nbytes + alignment, "cpprt aligned new");
+  *(u64*)x = nbytes;
+  return x + alignment;
+}
+
 void
-operator delete(void* p)
+operator delete(void* p) noexcept
 {
   panic("global operator delete");
 
@@ -37,60 +51,42 @@ operator delete(void* p)
 void*
 operator new[](std::size_t nbytes)
 {
+  // XXX This allocation is only aligned to 8 bytes, but could be backing a
+  // struct with larger allocation requirements. Anything containing a u128 or
+  // long double will probably crash as a result.
   u64* x = (u64*) kmalloc(nbytes + sizeof(u64), "array");
   *x = nbytes;
-
-  // Update debug_info
-  alloc_debug_info *adi = alloc_debug_info::of(x+1, nbytes);
-  if (KERNEL_HEAP_PROFILE) {
-    auto alloc_rip = __builtin_return_address(0);
-    if (heap_profile_update(HEAP_PROFILE_NEWARRAY, alloc_rip, nbytes))
-      adi->set_newarr_rip(alloc_rip);
-    else
-      adi->set_newarr_rip(nullptr);
-  }
-
   return x+1;
 }
 
 void
-operator delete[](void* p)
+operator delete[](void* p) noexcept
 {
   u64* x = (u64*) p;
-  std::size_t nbytes = x[-1];
-
-  // Update debug_info
-  alloc_debug_info *adi = alloc_debug_info::of(x, nbytes);
-  if (KERNEL_HEAP_PROFILE) {
-    auto alloc_rip = adi->newarr_rip();
-    if (alloc_rip)
-      heap_profile_update(HEAP_PROFILE_NEWARRAY, alloc_rip, -nbytes);
-  }
-
-  kmfree(x-1, nbytes + sizeof(u64));
+  kmfree(x-1, x[-1] + sizeof(u64));
 }
 
-void *
-operator new(std::size_t nbytes, void* buf) noexcept
-{
-  return buf;
-}
+// void *
+// operator new(std::size_t nbytes, void* buf) noexcept
+// {
+//   return buf;
+// }
 
-void
-operator delete(void* ptr, void*) noexcept
-{
-}
+// void
+// operator delete(void* ptr, void*) noexcept
+// {
+// }
 
-void*
-operator new[](std::size_t size, void* ptr) noexcept
-{
-  return ptr;
-}
+// void*
+// operator new[](std::size_t size, void* ptr) noexcept
+// {
+//   return ptr;
+// }
 
-void
-operator delete[](void* ptr, void*) noexcept
-{
-}
+// void
+// operator delete[](void* ptr, void*) noexcept
+// {
+// }
 
 void
 __cxa_pure_virtual(void)
@@ -144,9 +140,7 @@ __cxa_atexit(void (*f)(void*), void *p, void *d)
   return 0;
 }
 
-extern "C" void abort(void);
-void
-abort(void)
+extern "C" void abort(void)
 {
   panic("abort");
 }
@@ -180,18 +174,22 @@ cxx_unexpected(void)
 void *__dso_handle;
 
 namespace std {
-  std::ostream cout;
 
-  template<>
-  u128
-  atomic<u128>::load(memory_order __m) const noexcept
-  {
-    __sync_synchronize();
-    u128 v = _M_i;
-    __sync_synchronize();
+  void __terminate(void (*)()) { panic("__terminate"); }
+  void __unexpected(void (*)()) { panic("__unexpected"); }
 
-    return v;
-  }
+  // std::ostream cout;
+
+  // template<>
+  // u128
+  // atomic<u128>::load(memory_order __m) const noexcept
+  // {
+  //   __sync_synchronize();
+  //   u128 v = _M_i;
+  //   __sync_synchronize();
+
+  //   return v;
+  // }
 
 #if 0
   // XXX(sbw) If you enable this code, you might need to
@@ -217,32 +215,30 @@ namespace __cxxabiv1 {
 
 static bool malloc_proc = false;
 
-extern "C" void* malloc(size_t);
+// extern "C" void* malloc(size_t);
 void*
 malloc(size_t n)
 {
-  if (malloc_proc) {
-    assert(n <= sizeof(myproc()->exception_buf));
-    assert(cmpxch(&myproc()->exception_inuse, 0, 1));
-    return myproc()->exception_buf;
-  }
-
-  u64* p = (u64*) kmalloc(n+8, "cpprt malloc");
-  *p = n;
-  return p+1;
+  void* ptr;
+  assert(!posix_memalign(&ptr, n, 8));
+  return ptr;
 }
 
-extern "C" void free(void*);
+// extern "C" void free(void*);
 void
 free(void* vp)
 {
-  if (vp == myproc()->exception_buf) {
-    myproc()->exception_inuse = 0;
-    return;
-  }
+  u32 total_size = ((u32*)vp)[-1];
+  u32 ptrdiff = ((u32*)vp)[-2];
 
-  u64* p = (u64*) vp;
-  kmfree(p-1, p[-1]+8);
+  kmfree((char*)vp - ptrdiff, total_size);
+}
+
+//extern "C" void* realloc(void*, size_t);
+void*
+realloc(void* vp, size_t newsize) {
+  free(vp);
+  return malloc(newsize);
 }
 
 extern "C" int dl_iterate_phdr(void);
@@ -316,8 +312,8 @@ void
 initcpprt(void)
 {
 #if EXCEPTIONS
-  extern u8 __EH_FRAME_BEGIN__[];
-  __register_frame(__EH_FRAME_BEGIN__);
+  extern u8 __eh_frame_start[];
+  __register_frame(__eh_frame_start);
 
   // Initialize lazy exception handling data structures
   try {
@@ -331,3 +327,58 @@ initcpprt(void)
   panic("no catch");
 #endif
 }
+
+extern "C" void sprintf(char *buf, const char *fmt, ...);
+void sprintf(char *buf, const char *fmt, ...) {
+  panic("sprintf");
+}
+
+extern "C" void __sprintf_chk(char *buf, const char *fmt, ...);
+void __sprintf_chk(char *buf, const char *fmt, ...) {
+  panic("sprintf");
+}
+
+extern "C" int fputs(const char* str, void*stream);
+int fputs(const char* str, void*stream) {
+  panic("fputs");
+}
+
+extern "C" int fputc(char c, void *stream);
+int fputc(char c, void *stream) {
+  panic("fputc");
+}
+
+extern "C" size_t fwrite(const void *buffer, size_t size, size_t count, void* stream);
+size_t fwrite(const void *buffer, size_t size, size_t count, void* stream) {
+  panic("fwrite");
+}
+
+extern "C" const unsigned short ** __ctype_b_loc() { panic("__ctype_b_loc"); }
+extern "C" int32_t** __ctype_tolower_loc() { panic("__ctype_tolower_loc"); }
+
+extern "C" int fprintf(void*, const char* format, ...) { panic("fprintf"); }
+extern "C" int vfprintf(void*, const char* format, va_list vlist) { panic("vfprintf"); }
+
+extern "C" int posix_memalign(void **memptr, size_t alignment, size_t size) {
+  if (alignment < sizeof(void*) || (alignment & (alignment-1)))
+    return EINVAL;
+
+  if (size >= 2<<30)
+    return ENOMEM;
+
+  void* ptr = kmalloc(alignment+size, "posix_memalign");
+  *memptr = (void*)(((((u64)ptr) + 8) | (alignment-1)) + 1);
+  ((u32*)*memptr)[-1] = alignment+size;
+  ((u32*)*memptr)[-2] = (char*)*memptr - (char*)ptr;
+
+  return 0;
+}
+extern "C" void* calloc( size_t num, size_t size ) { panic("calloc"); }
+
+extern "C" void __assert_fail(const char *assertion, const char *file, int line,
+                              const char *function) {
+  panic("Assertion failed: %s, function %s, file %s, line %d",
+        assertion, function, file, line);
+}
+// std::logic_error::logic_error(char const* s): __imp_(s) {}
+// std::runtime_error::runtime_error(char const* s): __imp_(s) {}
