@@ -7,8 +7,8 @@
 #include "fs.h"
 #include "file.hh"
 #include "cpu.hh"
-#include "uk/unistd.h"
-#include "uk/fcntl.h"
+#include <uk/unistd.h>
+#include <uk/fcntl.h>
 
 #define PIPESIZE (16*4096)
 
