@@ -64,7 +64,7 @@ size_t strlen(const char* s);
 #endif
 
 _LIBCPP_BEGIN_NAMESPACE_STD
-
+#if 0
 using ::size_t;
 using ::memcpy;
 using ::memmove;
@@ -90,7 +90,7 @@ using ::strtok;
 using ::memset;
 using ::strerror;
 using ::strlen;
-
+#endif
 _LIBCPP_END_NAMESPACE_STD
 
 #endif  // _LIBCPP_CSTRING
