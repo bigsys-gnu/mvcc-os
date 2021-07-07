@@ -89,12 +89,14 @@ size_t __ctype_get_mb_cur_max(void);
 #define WNOHANG    1
 #define WUNTRACED  2
 
+#if 0	/* redefine of include/uk/wait.h */
 #define WEXITSTATUS(s) (((s) & 0xff00) >> 8)
 #define WTERMSIG(s) ((s) & 0x7f)
 #define WSTOPSIG(s) WEXITSTATUS(s)
 #define WIFEXITED(s) (!WTERMSIG(s))
 #define WIFSTOPPED(s) ((short)((((s)&0xffff)*0x10001)>>8) > 0x7f00)
 #define WIFSIGNALED(s) (((s)&0xffff)-1U < 0xffu)
+#endif
 
 int posix_memalign (void **, size_t, size_t);
 int setenv (const char *, const char *, int);
