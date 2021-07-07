@@ -288,3 +288,5 @@ void mpboot(void);
 void trapret(void);
 void threadstub(void);
 void threadhelper(void (*fn)(void *), void *arg);
+
+bool safestrcpy(char *s, const char *t, size_t n);
