@@ -71,9 +71,11 @@ ifeq ($(PLATFORM),xv6)
 INCLUDES  = --sysroot=$(O)/sysroot \
 	-iquote include -iquote$(O)/include \
     -iquote libutil/include \
-    -Ithird_party/lwip/src/include -Inet -Ithird_party/lwip/src/include/ipv4 -Ithird_party/libcxx/include \
-    -Ithird_party/acpica/source/include -Ithird_party/musl/include -nostdinc -Ithird_party/musl/arch/x86_64 \
+    -Ithird_party/lwip/src/include -Inet -Ithird_party/lwip/src/include/ipv4 \
+	-Ithird_party/libcxx/include -Ithird_party/acpica/source/include \
+	-Ithird_party/musl/include -nostdinc -Ithird_party/musl/arch/x86_64 \
     -Ithird_party/musl/arch/generic -Ithird_party/libunwind/include \
+	-Iinclude \
 	$(CODEXINC) -I$(MTRACESRC) \
 	-include param.h -include libutil/include/compiler.h
 COMFLAGS  = -static -DXV6_HW=$(HW) -DXV6 \
