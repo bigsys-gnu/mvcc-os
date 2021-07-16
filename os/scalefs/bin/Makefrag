@@ -75,6 +75,8 @@ UPROGS_BIN= \
 	testrecovery \
 	dirloop \
 	rename-chain \
+	rlu_benchlist\
+	rlu_test\
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \

@@ -26,6 +26,9 @@ MTRACE     ?= $(MTRACESRC)/x86_64-softmmu/qemu-system-x86_64
 
 O           = o.$(HW)
 
+QEMUNOREDIR ?= 1
+
+
 ifeq ($(HW),linux)
 PLATFORM   := native
 TOOLPREFIX := 
