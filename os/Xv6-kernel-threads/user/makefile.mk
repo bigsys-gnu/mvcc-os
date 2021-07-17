@@ -2,21 +2,16 @@
 # user programs
 USER_PROGS := \
 	cat\
-	echo\
-	forktest\
-	grep\
 	init\
-	kill\
-	ln\
 	ls\
-	mkdir\
-	rm\
+	ln\
 	sh\
-	malloc\
-	stressfs\
-	tester\
-	usertests\
+	grep\
+	kill\
+	echo\
+	rm\
 	wc\
+<<<<<<< HEAD
 	basic_thread\
 	benchlist\
 	benchlist_spinlock\
@@ -33,6 +28,11 @@ USER_PROGS := \
 	# test_fork\
 	# zombie\
 	# list_rcu\
+=======
+	malloc\
+	zombie\
+	rlu_test
+>>>>>>> origin/user-level-rlu
 
 USER_PROGS := $(addprefix user/, $(USER_PROGS))
 
@@ -42,7 +42,11 @@ USER_LIBS := \
 	ulib.o\
 	usys.o\
 	printf.o\
+<<<<<<< HEAD
 	# new-urcu.o\
+=======
+	rlu.o
+>>>>>>> origin/user-level-rlu
 
 USER_LIBS := $(addprefix user/, $(USER_LIBS))
 
@@ -119,4 +123,3 @@ user/%.d: user/%.c
 user/%.d: user/%.S
 	$(CC) $(CPPFLAGS) $(USER_CPPFLAGS) $(ASFLAGS) $(USER_ASFLAGS) \
 		-M -MG $< -MF $@ -MT $@ -MT $(<:.S=.o)
-

@@ -22,7 +22,11 @@ end
 
 echo Connecting to QEMU\n
 
+<<<<<<< HEAD
 echo (gdb) target remote localhost:1234\n
+=======
+echo (gdb) target remote localhost:26000\n
+>>>>>>> origin/user-level-rlu
 target remote localhost:26000
 
 echo (gdb) symbol-file kernel/kernel\n

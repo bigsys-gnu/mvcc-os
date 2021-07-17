@@ -1,6 +1,8 @@
 #ifndef _USER_H_
 #define _USER_H_
 
+#include "types.h"
+
 struct stat;
 struct rcu_data;
 struct rcu_maintain;
@@ -53,6 +55,8 @@ void printf(int, char*, ...);
 char* gets(char*, int max);
 uint strlen(char*);
 void* memset(void*, int, uint);
+void memcpy(void *dest, void *src, size_t n);
+void* malloc(uint);
 void free(void*);
 int atoi(const char*);
 int thread_create(void (*start_routine)(void*), void *arg);
