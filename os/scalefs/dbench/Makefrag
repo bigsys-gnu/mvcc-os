@@ -1,0 +1,64 @@
+# -*- makefile-gmake -*-
+
+-include $(O)/dbench/*.d
+
+DBENCH_CFLAGS := $(CFLAGS) -D_GNU_SOURCE
+DBENCH_INCLUDES := -I. -Idbench -I$(O)/dbench
+
+ifeq ($(PLATFORM),xv6)
+DBENCH_CFLAGS += -DXV6_USER
+endif
+
+ifeq ($(PLATFORM),native)
+LOCAL_LINK_CMD_BEGIN := $(Q)$(CC) $(CFLAGS)
+LOCAL_LINK_CMD_END :=  -Wl,--start-group $(UPROGS_LIBS) -Wl,--end-group $(ULIB_END)
+else
+LOCAL_LINK_CMD_BEGIN := $(Q)$(LD) $(LDFLAGS) 
+LOCAL_LINK_CMD_END :=  --start-group $(UPROGS_LIBS) --end-group $(ULIB_END)
+endif
+
+
+ifeq ($(PLATFORM),native)
+# Statically link for the Linux environment so we can create a trivial
+# initramfs without libraries
+LOCAL_LINK_CMD_END := $(LOCAL_LINK_CMD_END) -static
+# Unfortunately, the weak symbols in libpthread mean pthreads don't
+# work with static linking unless we force the linker to include the
+# whole archive.  This is, apparently, "not a bug"
+# (http://gcc.gnu.org/bugzilla/show_bug.cgi?id=52590).
+LOCAL_LINK_CMD_BEGIN += -Wl,--whole-archive -lpthread -Wl,--no-whole-archive
+endif
+
+
+DBENCH_SRCFILES := \
+	dbench/child.c \
+	dbench/dbench.c \
+	dbench/fileio.c \
+	dbench/util.c
+
+DBENCH_OBJFILES := $(patsubst %.c, $(O)/%.o, $(DBENCH_SRCFILES))
+
+ifeq ($(PLATFORM),xv6)
+DBENCH_OBJFILES: $(O)/include/sysstubs.h
+endif
+
+$(O)/dbench/%.o: dbench/%.c $(O)/sysroot
+	@echo "  CC	$@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(CC) $(DBENCH_CFLAGS) $(DBENCH_INCLUDES) -c -o $@ $<
+
+$(O)/dbench/dbench.unstripped: $(DBENCH_OBJFILES) $(ULIB_BEGIN) $(ULIB_END) $(UPROGS_LIBS)
+	@echo "  LD	$@"
+	$(Q)mkdir -p $(@D)
+ifeq ($(PLATFORM),native)
+	$(Q)$(LOCAL_LINK_CMD_BEGIN) -o $@ $(DBENCH_OBJFILES) $(ULIB_BEGIN) $(LOCAL_LINK_CMD_END)
+else
+	$(Q)$(LOCAL_LINK_CMD_BEGIN) -o $@ $(DBENCH_OBJFILES) $(ULIB_BEGIN) $(LOCAL_LINK_CMD_END)
+endif
+
+$(O)/dbench/dbench : $(O)/dbench/dbench.unstripped
+	@echo "  STRIP $@"
+	$(Q)mkdir -p $(@D)
+	$(Q)$(STRIP) -o $@ $<
+	$(Q)$(shell) cp $(O)/dbench/dbench $(O)/bin/
+	$(Q)$(shell) cp dbench/loadfiles/client.txt $(O)/bin/
