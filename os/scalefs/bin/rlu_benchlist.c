@@ -96,15 +96,10 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
  restart:
   RLU_READER_LOCK(self);
 
-  for (prev = (node_t *)RLU_DEREF(self, list->head), cur = (node_t *)RLU_DEREF(self, prev->next);
-       cur != NULL; prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
+  for (prev = (node_t *)RLU_DEREF(self, list->head), cur = (node_t *)RLU_DEREF(self, prev->next); ;
+	   prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
     {
-      if (cur->value == key)
-        {
-          RLU_READER_UNLOCK(self);
-          return ret;             /* the key value already exists. */
-        }
-      else if (cur->value > key)
+      if (cur == NULL || cur->value > key)
         {
           /* get the lock */
           if (!RLU_TRY_LOCK(self, &prev))
@@ -122,24 +117,10 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
           ret = 1;
 		  break;
         }
-    }
-
-  if (ret == 0 && cur == NULL)      /* cur is NULL now */
-    {
-      /* get the lock. */
-      if (!RLU_TRY_LOCK(self, &prev))
+      else if (cur->value == key)
         {
-          RLU_ABORT(self);
-          goto restart;
+          break;             /* the key value already exists. */
         }
-      /* initialize node */
-      new_node = (node_t *) RLU_ALLOC(sizeof(node_t));
-      new_node->value = key;
-      
-      /* insert node */
-      RLU_ASSIGN_PTR(self, &new_node->next, prev->next);
-      RLU_ASSIGN_PTR(self, &prev->next, new_node);
-      ret = 1;
     }
 
   RLU_READER_UNLOCK(self);
@@ -188,16 +169,16 @@ int list_find(rlu_thread_data_t *self, int key, list_t *list)
 
   cur = (node_t *)RLU_DEREF(self, list->head);
 
-  while(cur != NULL)
+  while(cur && cur->value < key)
   {
-	/* found the value. */
-	if (cur->value == key)
-	  {
-		value = cur->value;
-		break;
-	  }
 	cur = (node_t *)RLU_DEREF(self, cur->next);
   }
+
+  /* found the value. */
+  if (cur && cur->value == key)
+	{
+	  value = cur->value;
+	}
 
   RLU_READER_UNLOCK(self);
   return value;
@@ -373,7 +354,7 @@ int main(int argc, char **argv)
     }
   printf(" done!\n");
 
-  sleep(duration / 100);
+  sleep(duration / 1000);
   stop = 1;
 
   printf("join %d threads...\n", nb_threads);
