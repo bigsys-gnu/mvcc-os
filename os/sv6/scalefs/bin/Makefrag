@@ -77,7 +77,7 @@ UPROGS_BIN= \
 	rename-chain \
 	rlu_benchlist\
 	rlu_test\
-	mvrlu_benchlist\
+	pmutex\
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \

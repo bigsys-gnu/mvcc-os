@@ -7,6 +7,9 @@
 #include <sched.h>
 #include <stdio.h>
 #include <string.h>
+#include "futex.h"
+#define M_CAS(shared, old_v, new_v) __sync_val_compare_and_swap(shared, old_v, new_v)
+#define M_FAS(shared, dec) __sync_fetch_and_sub(shared, dec)
 
 enum { stack_size = 8192 };
 static std::atomic<int> nextkey;
@@ -168,23 +171,96 @@ sched_setaffinity(int pid, size_t cpusetsize, cpu_set_t *mask)
 }
 
 int       
-pthread_mutex_init(pthread_mutex_t *mutex, const pthread_mutexattr_t *attr)
+pthread_spin_init(pthread_mutex_t *spin, const pthread_mutexattr_t *attr)
+{
+  *spin = 0;
+  return 0;
+}
+
+int 
+pthread_spin_lock(pthread_mutex_t *spin)
+{
+  while(!__sync_bool_compare_and_swap(spin, 0, 1)) ;
+  return 0;
+}
+
+int
+pthread_spin_trylock(pthread_spinlock_t *spin)
+{
+  return __sync_bool_compare_and_swap(spin, 0, 1);
+}
+
+int 
+pthread_spin_unlock(pthread_mutex_t *spin)
+{
+  int b = __sync_bool_compare_and_swap(spin, 1, 0);
+  return !b;
+}
+
+// Mutex with futex example from
+// https://eli.thegreenplace.net/2018/basics-of-futexes/
+
+int
+pthread_mutex_init(pthread_mutex_t *mutex,
+                   const pthread_mutexattr_t *attr)
 {
   *mutex = 0;
   return 0;
 }
 
-int 
-pthread_mutex_lock(pthread_mutex_t *mutex)
+int
+pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-  while(!__sync_bool_compare_and_swap(mutex, 0, 1)) ;
+  // do nothing
   return 0;
 }
 
-int 
-pthread_mutex_unlock(pthread_mutex_t *mutex)
+int
+pthread_mutex_lock(pthread_mutex_t *mutex)
 {
-  int b = __sync_bool_compare_and_swap(mutex, 1, 0);
-  return !b;
+  int c = M_CAS(mutex, 0, 1);
+  // If the lock was previously unlocked, there's nothing else for us to do.
+  // Otherwise, we'll probably have to wait.
+  if (c != 0)
+  {
+    do {
+      // If the mutex is locked, we signal that we're waiting by setting the
+      // atom to 2. A shortcut checks is it's 2 already and avoids the atomic
+      // operation in this case.
+      if (c == 2 || M_CAS(mutex, 1, 2) != 0)
+      {
+        // Here we have to actually sleep, because the mutex is actually
+        // locked. Note that it's not necessary to loop around this syscall;
+        // a spurious wakeup will do no harm since we only exit the do...while
+        // loop when atom_ is indeed 0.
+        futex((const u64 *)mutex, FUTEX_WAIT, 2, 0);
+      }
+      // We're here when either:
+      // (a) the mutex was in fact unlocked (by an intervening thread).
+      // (b) we slept waiting for the atom and were awoken.
+      //
+      // So we try to lock the atom again. We set teh state to 2 because we
+      // can't be certain there's no other thread at this exact point. So we
+      // prefer to err on the safe side.
+    } while((c = M_CAS(mutex, 0, 2) != 0));
+  }
+  return 1;
 }
 
+int
+pthread_mutex_trylock(pthread_mutex_t *mutex)
+{
+  return M_CAS(mutex, 0, 1) == 0;
+}
+
+int
+pthread_mutex_unlock(pthread_mutex_t *mutex)
+{
+  if (M_FAS(mutex, 1) != 1)
+  {
+    *mutex = 0;
+    __sync_synchronize();
+    futex((const u64 *) mutex, FUTEX_WAKE, 1, 0);
+  }
+  return 1;
+}
