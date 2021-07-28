@@ -233,11 +233,12 @@ static inline void port_initiate_nap(pthread_mutex_t *mutex,
 	struct timespec ts;
 	unsigned long nsecs;
 
-	clock_gettime(CLOCK_REALTIME, &ts);
-	nsecs = usecs * 1000;
-	if (ts.tv_nsec + nsecs > 1000000000)
-		ts.tv_sec += 1;
-	ts.tv_nsec += nsecs % 1000000000;
+    ts.after_nano_sec = usecs * 1000;
+	/* clock_gettime(CLOCK_REALTIME, &ts); */
+	/* nsecs = usecs * 1000; */
+	/* if (ts.tv_nsec + nsecs > 1000000000) */
+	/* 	ts.tv_sec += 1; */
+	/* ts.tv_nsec += nsecs % 1000000000; */
 
 	port_mutex_lock(mutex);
 	{

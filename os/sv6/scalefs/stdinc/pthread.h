@@ -15,6 +15,15 @@ typedef int pthread_barrierattr_t;
 typedef int pthread_spinlock_t;
 typedef int pthread_mutex_t;
 typedef int pthread_mutexattr_t;
+typedef struct {
+  unsigned int value;
+  unsigned int previous;
+} pthread_cond_t;
+typedef int pthread_condattr_t;
+struct timespec {
+  unsigned long after_nano_sec;
+};
+
 #ifdef __cplusplus
 typedef std::atomic<unsigned> pthread_barrier_t;
 #else
@@ -53,6 +62,13 @@ int       pthread_spin_unlock(pthread_spinlock_t *);
 
 int       pthread_join(pthread_t tid, void **retvalp);
 void      pthread_exit(void *retval) __noret__;
+
+int       pthread_cond_init(pthread_cond_t *, const pthread_condattr_t *);
+int       pthread_cond_destroy(pthread_cond_t *);
+int       pthread_cond_wait(pthread_cond_t *, pthread_mutex_t *);
+int       pthread_cond_timedwait(pthread_cond_t *, pthread_mutex_t *, const struct timespec *);
+int       pthread_cond_broadcast(pthread_cond_t *);
+int       pthread_cond_signal(pthread_cond_t *);
 
 // Special xv6 pthread_create, flags is FORK_* bits
 int       xthread_create(pthread_t* tid, int flags,

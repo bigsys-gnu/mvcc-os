@@ -1,6 +1,7 @@
 #include "types.h"
 #include "pthread.h"
 #include "user.h"
+#include "limits.h"
 #include <atomic>
 #include "elfuser.hh"
 #include <unistd.h>
@@ -263,4 +264,72 @@ pthread_mutex_unlock(pthread_mutex_t *mutex)
     futex((const u64 *) mutex, FUTEX_WAKE, 1, 0);
   }
   return 1;
+}
+
+
+// simple condition implementation with futex
+// from https://www.remlab.net/op/futex-condvar.shtml
+// Copyrigt 2004-2021 Remi Denis-Courmont
+
+int
+pthread_cond_init(pthread_cond_t *cv, const pthread_condattr_t * mock)
+{
+  *cv = (pthread_cond_t) {0};
+  return 0;
+}
+
+int
+pthread_cond_destroy(pthread_cond_t *cv)
+{
+  // do nothing
+  (void)cv;
+  return 0;
+}
+
+int
+pthread_cond_wait(pthread_cond_t *cv, pthread_mutex_t *mtx)
+{
+  return pthread_cond_timedwait(cv, mtx, NULL);
+}
+
+int
+pthread_cond_signal(pthread_cond_t *cv)
+{
+  unsigned value;
+  __atomic_load(&cv->previous, &value, __ATOMIC_RELAXED);
+  value += 1u;
+
+  __atomic_store(&cv->value, &value, __ATOMIC_RELAXED);
+
+  futex((const u64 *)&cv->value, FUTEX_WAKE, 1, 0);
+
+  return 0;
+}
+
+int
+pthread_cond_timedwait(pthread_cond_t *cv, pthread_mutex_t *mtx,
+                       const struct timespec *ts)
+{
+  int value;
+  __atomic_load(&cv->value, &value, __ATOMIC_RELAXED);
+  __atomic_store(&cv->previous, &value, __ATOMIC_RELAXED);
+
+  pthread_mutex_unlock(mtx);
+  futex((const u64 *)&cv->value, FUTEX_WAIT, value, (u64)ts->after_nano_sec);
+  pthread_mutex_lock(mtx);
+  return 0;
+}
+
+int
+pthread_cond_broadcast(pthread_cond_t *cv)
+{
+  unsigned value;
+  __atomic_load(&cv->previous, &value, __ATOMIC_RELAXED);
+  value += 1u;
+
+  __atomic_store(&cv->value, &value, __ATOMIC_RELAXED);
+
+  futex((const u64 *)&cv->value, FUTEX_WAKE, INT_MAX, 0);
+
+  return 0;
 }
