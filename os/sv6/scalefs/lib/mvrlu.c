@@ -9,6 +9,8 @@
 #include "mvrlu/arch.h"
 #include "mvrlu/port-user.h"
 
+#define EBUSY 16
+
 static inline void *port_alloc(size_t size)
 {
 	return port_alloc_x(size, PORT_DEFAULT_ALLOC_FLAG);
