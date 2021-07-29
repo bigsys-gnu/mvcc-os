@@ -13,6 +13,7 @@ typedef int pthread_attr_t;
 typedef int pthread_key_t;
 typedef int pthread_barrierattr_t;
 typedef int pthread_spinlock_t;
+typedef int pthread_spinlockattr_t;
 typedef int pthread_mutex_t;
 typedef int pthread_mutexattr_t;
 typedef struct {
@@ -47,18 +48,18 @@ int       pthread_barrier_init(pthread_barrier_t *b,
                                unsigned count);
 int       pthread_barrier_wait(pthread_barrier_t *b);
 
+int       pthread_spin_init(pthread_spinlock_t *, pthread_spinlockattr_t);
+int       pthread_spin_destroy(pthread_spinlock_t *);
+int       pthread_spin_lock(pthread_spinlock_t *);
+int       pthread_spin_trylock(pthread_spinlock_t *);
+int       pthread_spin_unlock(pthread_spinlock_t *);
+
 int       pthread_mutex_init(pthread_mutex_t *mutex,
                              const pthread_mutexattr_t *attr);
 int       pthread_mutex_destroy(pthread_mutex_t *mutex);
 int       pthread_mutex_lock(pthread_mutex_t *mutex);
 int       pthread_mutex_trylock(pthread_mutex_t *mutex);
 int       pthread_mutex_unlock(pthread_mutex_t *mutex);
-
-int       pthread_spin_init(pthread_spinlock_t *, int);
-int       pthread_spin_destroy(pthread_spinlock_t *);
-int       pthread_spin_lock(pthread_spinlock_t *);
-int       pthread_spin_trylock(pthread_spinlock_t *);
-int       pthread_spin_unlock(pthread_spinlock_t *);
 
 int       pthread_join(pthread_t tid, void **retvalp);
 void      pthread_exit(void *retval) __noret__;

@@ -172,14 +172,14 @@ sched_setaffinity(int pid, size_t cpusetsize, cpu_set_t *mask)
 }
 
 int       
-pthread_spin_init(pthread_mutex_t *spin, const pthread_mutexattr_t *attr)
+pthread_spin_init(pthread_spinlock_t *spin, const pthread_spinlockattr_t *attr)
 {
   *spin = 0;
   return 0;
 }
 
 int 
-pthread_spin_lock(pthread_mutex_t *spin)
+pthread_spin_lock(pthread_spinlock_t *spin)
 {
   while(!__sync_bool_compare_and_swap(spin, 0, 1)) ;
   return 0;
@@ -192,7 +192,7 @@ pthread_spin_trylock(pthread_spinlock_t *spin)
 }
 
 int 
-pthread_spin_unlock(pthread_mutex_t *spin)
+pthread_spin_unlock(pthread_spinlock_t *spin)
 {
   int b = __sync_bool_compare_and_swap(spin, 1, 0);
   return !b;
@@ -212,7 +212,9 @@ pthread_mutex_init(pthread_mutex_t *mutex,
 int
 pthread_mutex_destroy(pthread_mutex_t *mutex)
 {
-  // do nothing
+  *mutex = 0;
+  __sync_synchronize();
+  futex((const u64 *) mutex, FUTEX_WAKE, INT_MAX, 0);
   return 0;
 }
 
@@ -295,27 +297,24 @@ pthread_cond_wait(pthread_cond_t *cv, pthread_mutex_t *mtx)
 int
 pthread_cond_signal(pthread_cond_t *cv)
 {
-  unsigned value;
-  __atomic_load(&cv->previous, &value, __ATOMIC_RELAXED);
-  value += 1u;
-
-  __atomic_store(&cv->value, &value, __ATOMIC_RELAXED);
+  unsigned value = 1u + __atomic_load_n(&cv->previous, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&cv->value, value, __ATOMIC_SEQ_CST);
 
   futex((const u64 *)&cv->value, FUTEX_WAKE, 1, 0);
 
-  return 0;
+  return 1;
 }
 
 int
 pthread_cond_timedwait(pthread_cond_t *cv, pthread_mutex_t *mtx,
                        const struct timespec *ts)
 {
-  int value;
-  __atomic_load(&cv->value, &value, __ATOMIC_RELAXED);
-  __atomic_store(&cv->previous, &value, __ATOMIC_RELAXED);
+  int value = __atomic_load_n(&cv->value, __ATOMIC_SEQ_CST);
+  __atomic_store_n(&cv->previous, value, __ATOMIC_SEQ_CST);
 
   pthread_mutex_unlock(mtx);
-  futex((const u64 *)&cv->value, FUTEX_WAIT, value, (u64)ts->after_nano_sec);
+  futex((const u64 *)&cv->value, FUTEX_WAIT, value,
+        (u64)(ts ? ts->after_nano_sec : 0));
   pthread_mutex_lock(mtx);
   return 0;
 }
@@ -323,13 +322,11 @@ pthread_cond_timedwait(pthread_cond_t *cv, pthread_mutex_t *mtx,
 int
 pthread_cond_broadcast(pthread_cond_t *cv)
 {
-  unsigned value;
-  __atomic_load(&cv->previous, &value, __ATOMIC_RELAXED);
-  value += 1u;
+  unsigned value = 1u + __atomic_load_n(&cv->previous, __ATOMIC_SEQ_CST);
 
-  __atomic_store(&cv->value, &value, __ATOMIC_RELAXED);
+  __atomic_store_n(&cv->value, value, __ATOMIC_SEQ_CST);
 
   futex((const u64 *)&cv->value, FUTEX_WAKE, INT_MAX, 0);
 
-  return 0;
+  return 1;
 }

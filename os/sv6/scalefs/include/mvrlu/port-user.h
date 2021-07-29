@@ -7,6 +7,8 @@
 #define __init
 #define EXPORT_SYMBOL(sym)
 #define early_initcall(fn)
+#define MADV_DONTNEED 0
+#define PTHREAD_PROCESS_PRIVATE 0
 
 /*
  * Log region
@@ -46,7 +48,8 @@ static inline int port_log_region_init(unsigned long size, unsigned long num)
 	g_start_addr = mmap(NULL, region_size, PROT_READ | PROT_WRITE,
 			    MAP_PRIVATE | MAP_ANONYMOUS, -1, 0);
 	if (unlikely(g_start_addr == MAP_FAILED))
-		return errno;
+        return 0;
+		/* return errno; */
 	g_end_addr = g_start_addr + region_size;
 	return 0;
 }
@@ -144,12 +147,13 @@ static inline void port_free(void *ptr)
 
 static inline void port_spin_init(pthread_spinlock_t *lock)
 {
-	pthread_spin_init(lock, PTHREAD_PROCESS_PRIVATE);
+	/* pthread_spin_init(lock, PTHREAD_PROCESS_PRIVATE); */
+    *lock = 0;
 }
 
 static inline void port_spin_destroy(pthread_spinlock_t *lock)
 {
-	pthread_spin_destroy(lock);
+	/* pthread_spin_destroy(lock); */
 }
 
 static inline void port_spin_lock(pthread_spinlock_t *lock)
@@ -159,7 +163,7 @@ static inline void port_spin_lock(pthread_spinlock_t *lock)
 
 static inline int port_spin_trylock(pthread_spinlock_t *lock)
 {
-	return pthread_spin_trylock(lock) == 0;
+	return pthread_spin_trylock(lock);
 }
 
 static inline void port_spin_unlock(pthread_spinlock_t *lock)
@@ -231,7 +235,6 @@ static inline void port_initiate_nap(pthread_mutex_t *mutex,
 				     pthread_cond_t *cond, unsigned long usecs)
 {
 	struct timespec ts;
-	unsigned long nsecs;
 
     ts.after_nano_sec = usecs * 1000;
 	/* clock_gettime(CLOCK_REALTIME, &ts); */
