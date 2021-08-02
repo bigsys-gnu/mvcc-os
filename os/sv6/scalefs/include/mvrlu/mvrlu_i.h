@@ -2,6 +2,7 @@
 #define _MVRLU_I_H
 #include "arch.h"
 #include "config.h"
+#include "debug.h"
 
 #define MAX_VERSION (ULONG_MAX - 1)
 #define MIN_VERSION (0ul)

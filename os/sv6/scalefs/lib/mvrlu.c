@@ -133,47 +133,49 @@ static inline void assert_chs_type(const mvrlu_cpy_hdr_struct_t *chs)
 #define stat_qp_merge(qp)
 #endif /* MVRLU_ENABLE_STATS */
 
-/* static const char *stat_get_name(int s) */
-/* { */
-/* /\* */
-/* 	 * Check out following implementation tricks: */
-/* 	 * - C preprocessor applications */
-/* 	 *   https://bit.ly/2H1sC5G */
-/* 	 * - Stringification */
-/* 	 *   https://gcc.gnu.org/onlinedocs/gcc-4.1.2/cpp/Stringification.html */
-/* 	 * - Designated Initializers in C */
-/* 	 *   https://www.geeksforgeeks.org/designated-initializers-c/ */
-/* 	 *\/ */
-/* #undef S */
-/* #define S(x) [stat_##x] = #x, */
-/* 	static const char *stat_string[stat_max__ + 1] = { STAT_NAMES }; */
+#ifdef MVRLU_ENABLE_STATS
+static const char *stat_get_name(int s)
+{
+/*
+	 * Check out following implementation tricks:
+	 * - C preprocessor applications
+	 *   https://bit.ly/2H1sC5G
+	 * - Stringification
+	 *   https://gcc.gnu.org/onlinedocs/gcc-4.1.2/cpp/Stringification.html
+	 * - Designated Initializers in C
+	 *   https://www.geeksforgeeks.org/designated-initializers-c/
+	 */
+#undef S
+#define S(x) [stat_##x] = #x,
+	static const char *stat_string[stat_max__ + 1] = { STAT_NAMES };
 
-/* 	mvrlu_assert(s >= 0 && s < stat_max__); */
-/* 	return stat_string[s]; */
-/* } */
+	mvrlu_assert(s >= 0 && s < stat_max__);
+	return stat_string[s];
+}
 
-/* static void stat_print_cnt(mvrlu_stat_t *stat) */
-/* { */
-/* 	int i; */
-/* 	for (i = 0; i < stat_max__; ++i) { */
-/* 		printf("  %30s = %lu\n", stat_get_name(i), stat->cnt[i]); */
-/* 	} */
-/* } */
+static void stat_print_cnt(mvrlu_stat_t *stat)
+{
+	int i;
+	for (i = 0; i < stat_max__; ++i) {
+		printf("  %30s = %lu\n", stat_get_name(i), stat->cnt[i]);
+	}
+}
 
-/* static void stat_reset(mvrlu_stat_t *stat) */
-/* { */
-/* 	int i; */
-/* 	for (i = 0; i < stat_max__; ++i) { */
-/* 		stat->cnt[i] = 0; */
-/* 	} */
-/* } */
-/* static void stat_atomic_merge(mvrlu_stat_t *tgt, mvrlu_stat_t *src) */
-/* { */
-/* 	int i; */
-/* 	for (i = 0; i < stat_max__; ++i) { */
-/* 		smp_faa(&tgt->cnt[i], src->cnt[i]); */
-/* 	} */
-/* } */
+static void stat_reset(mvrlu_stat_t *stat)
+{
+	int i;
+	for (i = 0; i < stat_max__; ++i) {
+		stat->cnt[i] = 0;
+	}
+}
+static void stat_atomic_merge(mvrlu_stat_t *tgt, mvrlu_stat_t *src)
+{
+	int i;
+	for (i = 0; i < stat_max__; ++i) {
+		smp_faa(&tgt->cnt[i], src->cnt[i]);
+	}
+}
+#endif
 
 static inline void stat_inc(mvrlu_stat_t *stat, int s)
 {
