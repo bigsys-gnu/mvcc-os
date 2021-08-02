@@ -59,7 +59,9 @@ static inline void port_log_region_destroy(void)
 	if (unlikely(g_start_addr == NULL))
 		return;
 
+    #ifndef DISABLE_MUNMAP
 	munmap(g_start_addr, g_lr.size * g_lr.num);
+    #endif
 	g_start_addr = g_end_addr = NULL;
 }
 

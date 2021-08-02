@@ -2,19 +2,9 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+#include "user.h"
 #include "mvrlu/mvrlu.h"
 #include "mvrlu/mvrlu_i.h"
-
-#define assert(COND)\
-  if (!(COND)) {\
-  printf(#COND);\
-  exit(1);\
-  }
-
-#undef NULL
-#define NULL ((void*)0)
-
-#define PGSIZE (4096)
 
 #define MAX_BUCKETS (128)
 #define DEFAULT_BUCKETS                 1
@@ -236,6 +226,11 @@ void *test(void* param)
   hash_list_t *p_hash_list = p_data->p_hash_list;
   rlu_thread_data_t *self = &p_data->self;
 
+  if (setaffinity(p_data->id % NCPU) < 0)
+  {
+    RLU_THREAD_FINISH(self);
+    die("affinity error");
+  }
 
   pthread_barrier_wait(&bar);
 
