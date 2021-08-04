@@ -77,6 +77,8 @@ UPROGS_BIN= \
 	rename-chain \
 	rlu_benchlist\
 	rlu_test\
+	list_rcu\
+	list_spinlock\
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \
