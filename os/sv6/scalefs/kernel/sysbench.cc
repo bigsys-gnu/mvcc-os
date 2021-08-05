@@ -17,14 +17,8 @@
 #include <uk/unistd.h>
 
 #define MAX_BUCKETS (128)
-#define DEFAULT_BUCKETS                 2
-#define DEFAULT_DURATION                5000
-#define DEFAULT_UPDATE                  200
-#define DEFAULT_INITIAL                 32
-#define DEFAULT_NB_THREADS              2
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
-
 
 typedef struct node {
     int value;
@@ -107,14 +101,12 @@ int list_insert(int key, list_t *list)
 
     if(ret){
         //no node with key value
-        new_node = (node_t*)kmalloc(sizeof(node_t), "node2");
+        new_node = (node_t*)kmalloc(sizeof(node_t), "node");
         new_node->next = NULL;
         new_node->value = key;
         prev->next = new_node;
     }
-    else
-    {
-    }
+
     list->lk.release();
 
     return ret;
@@ -166,9 +158,10 @@ int list_find(int key, list_t *list)
 
     for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
-        if ((val = cur->value) >= key)
-            break;
-        ret = (val == key);
+        if ((val = cur->value) == key)
+        {
+            ret = (val == key);
+        }
     }
     list->lk.release();
 
@@ -179,7 +172,6 @@ void test(void* param)
 {
     int op, bucket, value;
     value = 1;
-    cprintf("thread Start\n");
     cprintf("thread %d Start\n", myproc()->pid);
 
 
@@ -220,17 +212,14 @@ void test(void* param)
             }
             p_data->result_found++;
         }
-        /* sleep(1); */
     }
-
-    // cprintf("thread %d end\n", getpid());
 }
 
 
 
 //SYSCALL
 void
-sys_benchmark(void)
+sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 {
     cprintf("Run Kernel Level Benchmark\n");
 
@@ -244,20 +233,12 @@ sys_benchmark(void)
     unsigned long reads = 0, updates = 0;
     unsigned long iv = 0, fv = 0;
 
-	int n_buckets = DEFAULT_BUCKETS;
-	int initial = DEFAULT_INITIAL;
-	int nb_threads = DEFAULT_NB_THREADS;
-	int duration = DEFAULT_DURATION;
-	int update = DEFAULT_UPDATE;
-	int range = DEFAULT_RANGE;
-
-    cprintf("-Nb threads   : %d\n", nb_threads);
-    cprintf("-Initial size : %d\n", initial);
-    cprintf("-Buckets      : %d\n", n_buckets);
-    cprintf("-Duration     : %d\n", duration);
-    cprintf("-Update rate  : %d\n", update);
-    cprintf("-range        : %d\n", range);
-    cprintf("-Set type     : hash-list\n");
+	int n_buckets = buck;
+	int initial = init;
+	int nb_threads = th;
+	int duration = dur;
+	int update = upd;
+	int range = rng;
 
     assert(n_buckets >= 1);
     assert(duration >= 0);
@@ -326,8 +307,8 @@ sys_benchmark(void)
         param_list[i].variation = 0;
         param_list[i].p_hash_list = p_hash_list;
 
-        thread_list[i] = threadpin(test, (void*)&param_list[i], "test_thread", (i+1)%ncpu);
-        cprintf("\nThread created %p(%d)\n", thread_list[i], thread_list[i]->get_state());
+        thread_list[i] = threadpin(test, (void*)&param_list[i], "test_thread", i%(ncpu-1)+1);
+        cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(ncpu-1)+1, thread_list[i]->get_state());
     }
     cprintf(" done!\n");
 

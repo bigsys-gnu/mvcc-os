@@ -10,6 +10,7 @@ endif
 
 UPROGS_BIN= \
         bench \
+		kbench \
 	cat \
         du \
 	echo \

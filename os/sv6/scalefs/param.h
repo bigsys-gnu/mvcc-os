@@ -164,5 +164,5 @@
 #define RTC_TZ_SECS 0
 #endif
 #ifndef QUANTUM
-#define QUANTUM      10  // scheduling time quantum and tick length (in msec)
+#define QUANTUM      1  // scheduling time quantum and tick length (in msec)
 #endif
