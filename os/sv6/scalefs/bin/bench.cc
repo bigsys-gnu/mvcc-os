@@ -151,7 +151,7 @@ main(int ac, char **av)
   //the_bench[n++] = CMD("metis_wrmem-jo");
   //the_bench[n++] = CMD("lsocket");
   
-  benchmark();
+  // benchmark();
 
   for (int i = 0; i < n; i++)
     the_bench[i]->run();
