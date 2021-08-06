@@ -50,10 +50,10 @@ typedef struct thread_param {
     hash_list_t *p_hash_list;
 } thread_param_t;
 
-int
+uint64_t
 u_rand(void)
 {
-  int t = rdtsc();
+  uint64_t t = rdtsc() / 2;
   return (t >= 0) ? t : 0 - t;
 }
 
@@ -69,6 +69,8 @@ int randomrange(int lo, int hi)
   int range = hi - lo + 1;
   return u_rand() % (range) + lo;
 }
+
+
 
 int list_insert(int key, list_t *list)
 {
@@ -161,6 +163,7 @@ int list_find(int key, list_t *list)
         if ((val = cur->value) == key)
         {
             ret = (val == key);
+            break;
         }
     }
     list->lk.release();
@@ -339,7 +342,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 		cprintf( "  #remove     : %d\n", param_list[i].result_remove);
 		cprintf( "  #contains   : %d\n", param_list[i].result_contains);
 		cprintf( "  #found      : %d\n", param_list[i].result_found);
-		reads += param_list[i].result_contains;
+		reads += param_list[i].result_found;
 		updates += (param_list[i].result_add + param_list[i].result_remove);
 		total_variation += param_list[i].variation;
 	}

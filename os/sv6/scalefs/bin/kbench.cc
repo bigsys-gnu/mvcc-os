@@ -11,7 +11,7 @@
 
 #define MAX_BUCKETS (128)
 #define DEFAULT_BUCKETS                 2
-#define DEFAULT_DURATION                15000
+#define DEFAULT_DURATION                1500
 #define DEFAULT_UPDATE                  200
 #define DEFAULT_INITIAL                 32
 #define DEFAULT_NB_THREADS              4
