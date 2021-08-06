@@ -79,6 +79,9 @@ UPROGS_BIN= \
 	rlu_test\
 	list_rcu\
 	list_spinlock\
+	pmutex\
+	mvrlu_bench\
+	condtest\
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \
