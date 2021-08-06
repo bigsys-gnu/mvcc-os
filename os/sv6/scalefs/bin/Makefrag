@@ -77,8 +77,6 @@ UPROGS_BIN= \
 	rename-chain \
 	rlu_benchlist\
 	rlu_test\
-	list_rcu\
-	list_spinlock\
 	pmutex\
 	mvrlu_bench\
 	condtest\
