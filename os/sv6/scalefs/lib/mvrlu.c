@@ -56,7 +56,7 @@ static volatile unsigned long
 #define advance_clock() smp_faa(&g_wrt_clk, 1)
 #define correct_qp_clk(qp_clk) qp_clk
 #else /* MVRLU_ORDO_TIMESTAMPING */
-#include "ordo_clock.h"
+#include "mvrlu/ordo_clock.h"
 #define gte_clock(__t1, __t2) ordo_gt_clock(__t1, __t2)
 #define lte_clock(__t1, __t2) ordo_lt_clock(__t1, __t2)
 #define get_clock() ordo_get_clock()
