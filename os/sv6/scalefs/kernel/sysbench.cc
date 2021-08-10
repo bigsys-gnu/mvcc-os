@@ -273,7 +273,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     hash_list_t *p_hash_list;
     struct proc** thread_list;
     int stop = 0;
-    int initial_time = 0;
+    u64 initial_time = 0;
     unsigned long exp = 0, total_variation = 0, total_size = 0;
     unsigned long reads = 0, updates = 0;
     unsigned long iv = 0, fv = 0;
@@ -306,7 +306,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
         return;
     }
    
-    initial_time = (int)(nsectime() / 1000000);
+    initial_time = nsectime();
     cprintf("Main thread ID: %d\n", myproc()->pid);
     cprintf("Creating %d threads...", nb_threads);
     for(int i = 0; i < nb_threads; i++)
@@ -325,15 +325,16 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     }
     cprintf(" done!\n");
 
-    while(1)
     {
-        if((nsectime() / 1000000) - initial_time > duration)
-        {
-            stop = 1;
-            cprintf( "elapsed time: %dms\n", (int)((nsectime() / 1000000) - initial_time));
-            break;
-        }
-        // cprintf( "elapsed time: %dms\n", (int)(nsectime() / 1000000));
+        struct spinlock tmp("sleep lock");
+        struct condvar cond("sleep cond");
+        u64 until = initial_time + duration * 1000000;
+
+        scoped_acquire l(&tmp);
+        while(until > nsectime())
+            cond.sleep_to(&tmp, until);
+
+        stop = 1;
     }
 
     cprintf("join %d threads...\n", nb_threads);
