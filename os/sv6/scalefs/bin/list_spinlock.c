@@ -14,7 +14,7 @@
 
 #define PGSIZE (4096)
 
-#define MAX_BUCKETS (128)
+#define MAX_BUCKETS (1024)
 #define DEFAULT_BUCKETS                 1
 #define DEFAULT_DURATION                1000
 #define DEFAULT_UPDATE                  200
@@ -364,7 +364,7 @@ int main(int argc, char **argv)
     printf("  #remove     : %d\n", param_list[i].result_remove);
     printf("  #contains   : %d\n", param_list[i].result_contains);
     printf("  #found      : %d\n", param_list[i].result_found);
-    reads += param_list[i].result_contains;
+    reads += param_list[i].result_found;
     updates += (param_list[i].result_add + param_list[i].result_remove);
     total_variation += param_list[i].variation;
   }
