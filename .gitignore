@@ -20,6 +20,8 @@ os/Xv6-kernel-threads/tools/mkfs
 os/Xv6-kernel-threads/user/bin/
 os/Xv6-kernel-threads/xv6.img
 
+# ORDO
+os/sv6/scalefs/bin/numa-config.h
 
 # Prerequisites
 *.d

@@ -3,6 +3,8 @@
 #include "arch.h"
 
 #define DISABLE_MUNMAP
+//#define MVRLU_ORDO_TIMESTAMPING	// ENABLE ORDO TIMESTAMP
+
 #define MVRLU_LOG_SIZE (1ul << 19) /* 512KB */
 #define MVRLU_LOG_MASK (~(MVRLU_LOG_SIZE - 1))
 #define MVRLU_MAX_THREAD_NUM (1ul << 14) /* 16384 (2**18 * 2**14 = 2**32) */

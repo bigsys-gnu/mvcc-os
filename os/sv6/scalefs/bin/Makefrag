@@ -1,5 +1,4 @@
 # -*- makefile-gmake -*-
-
 $(O)/bin/%.o: CFLAGS:=$(CFLAGS)
 $(O)/bin/%.o: CXXFLAGS:=$(CXXFLAGS)
 
@@ -10,7 +9,7 @@ endif
 
 UPROGS_BIN= \
         bench \
-		kbench \
+	kbench \
 	cat \
         du \
 	echo \

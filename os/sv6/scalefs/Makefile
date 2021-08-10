@@ -1,3 +1,6 @@
+CUR_DIR   := $(shell dirname $(realpath $(lastword $(MAKEFILE_LIST))))
+include $(CUR_DIR)/../../../Makefile.inc
+
 # Custom config file?  Otherwise use defaults.
 -include config.mk
 # Quiet.  Run "make Q=" for a verbose build.
@@ -27,7 +30,6 @@ MTRACE     ?= $(MTRACESRC)/x86_64-softmmu/qemu-system-x86_64
 O           = o.$(HW)
 
 QEMUNOREDIR ?= 1
-
 
 ifeq ($(HW),linux)
 PLATFORM   := native
@@ -113,7 +115,11 @@ endif
 HAVE_TESTGEN = $(shell (test -e libutil/testgen.c && echo y) || echo n)
 
 ALL := 
-all:
+all: numa-config
+
+numa-config:
+	@echo "Generate numa-config"
+	$(SYNC_TOOLS_DIR)/cpu-topology.py > $(CUR_DIR)/bin/numa-config.h
 
 define SYSCALLGEN
 	@echo "  GEN    $@"
