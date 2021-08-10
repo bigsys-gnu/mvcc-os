@@ -20,6 +20,13 @@
 #define MAX_BUCKETS (128)
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
+
+enum SYN_TYPE {
+    SPINLOCK,
+    RCU,
+    RLU,
+    MVRLU,
+};
 /////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
 /////////////////////////////////////////////////////////
@@ -69,12 +76,12 @@ typedef struct node {
     NEW_DELETE_OPS(node);
 } node_t;
 
-
 typedef struct list {
-    spinlock lk;
     node_t *head;
 
-    list(void): lk("list_lock"), head(NULL) {}
+    list(void): head(NULL) {}
+
+    virtual
     ~list(void) {
         for (node_t *iter  = head; iter != NULL;)
         {
@@ -83,7 +90,7 @@ typedef struct list {
             delete trash;
         }
     }
-    NEW_DELETE_OPS(list);
+
     // insert without lock
     int raw_insert(int key) {
         node_t *prev = NULL, *cur = NULL, *new_node = NULL;
@@ -120,13 +127,24 @@ typedef struct list {
 
         return ret;
     }
+    virtual int list_insert(int key) = 0;
+    virtual int list_delete(int key) = 0;
+    virtual int list_find(int key) = 0;
 
-    int list_insert(int key) {
+} list_t;
+
+
+struct spinlock_list : public list {
+    spinlock lk;
+
+    spinlock_list(void): list(), lk("list_lock") {}
+
+    int list_insert(int key) override {
         scoped_acquire l(&lk);
         return raw_insert(key);
     }
 
-    int list_delete(int key) {
+    int list_delete(int key) override {
         node_t *prev, *cur;
         int ret = 0;
 
@@ -160,7 +178,7 @@ typedef struct list {
         return ret;
     }
 
-    int list_find(int key) {
+    int list_find(int key) override {
         node_t *prev = NULL, *cur = NULL;
         int ret = 0, val;
 
@@ -178,15 +196,31 @@ typedef struct list {
         return ret;
     }
 
-} list_t;
+    NEW_DELETE_OPS(spinlock_list);
+};
+
+list_t *
+get_list(enum SYN_TYPE type)
+{
+    switch(type){
+    case SPINLOCK:
+        return static_cast<list *>(new spinlock_list);
+    case RCU:
+    case RLU:
+    case MVRLU:
+        return NULL;
+    default:
+        return NULL;
+    }
+}
 
 typedef struct hash_list {
     int n_buckets;
     list_t *buckets[MAX_BUCKETS];  
 
-    hash_list(int n_buc, int initial, int range): n_buckets(n_buc) {
+    hash_list(int n_buc, int initial, int range, enum SYN_TYPE type): n_buckets(n_buc) {
         for (int i = 0; i < n_buckets; i++) {
-            list_t *list = new list_t;
+            list_t *list = get_list(type);
             if (list == NULL) {
                 cprintf("spinlock_list init error\n");
                 return;
@@ -327,7 +361,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 	assert(update >= 0 && update <= 1000);
 	assert(range > 0 && range >= initial);
 
-    p_hash_list = new hash_list(n_buckets, initial, range);
+    p_hash_list = new hash_list(n_buckets, initial, range, SPINLOCK);
 
     thread_list = new struct proc *[nb_threads];
     if (thread_list == NULL) {
