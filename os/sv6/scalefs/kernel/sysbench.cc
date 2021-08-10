@@ -20,6 +20,47 @@
 #define MAX_BUCKETS (128)
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
+/////////////////////////////////////////////////////////
+// HELPER FUNCTIONS
+/////////////////////////////////////////////////////////
+uint64_t
+u_rand(void)
+{
+  uint64_t t = rdtsc() / 2;
+  return (t >= 0) ? t : 0 - t;
+}
+
+static inline int MarsagliaXORV (int x) { 
+  if (x == 0) x = 1 ; 
+  x ^= x << 6;
+  x ^= ((unsigned)x) >> 21;
+  x ^= x << 7 ; 
+  return x ;        // use either x or x & 0x7FFFFFFF
+}
+
+static inline int MarsagliaXOR (int * seed) {
+  int x = MarsagliaXORV(*seed);
+  *seed = x ; 
+  return x & 0x7FFFFFFF;
+}
+
+static inline void rand_init(unsigned short *seed)
+{
+  seed[0] = (unsigned short)u_rand();
+  seed[1] = (unsigned short)u_rand();
+  seed[2] = (unsigned short)u_rand();
+}
+
+static inline int rand_range(int n, unsigned short *seed)
+{
+  /* Return a random number in range [0;n) */
+  
+  /*int v = (int)(erand48(seed) * n);
+  assert (v >= 0 && v < n);*/
+  
+  int v = MarsagliaXOR((int *)seed) % n;
+  return v;
+}
 
 int randomrange(int lo, int hi);
 
@@ -155,9 +196,12 @@ typedef struct hash_list {
         }
         cprintf("initialize %d nodes...", initial);
         int j = 0;
+        unsigned short seed[3];
+
+        rand_init(seed);
         while (j < initial)
         {
-            int value = randomrange(1, range);
+            int value = rand_range(range, seed);
             int bucket = HASH_VALUE(this, value);
 
             if (buckets[bucket]->raw_insert(value))
@@ -190,27 +234,19 @@ typedef struct thread_param {
     int result_found;
     int *stop;
     hash_list_t *p_hash_list;
+    unsigned short seed[3];
+
+    thread_param(int n_buckets, int initial, int nb_threads, int update, int range,
+                 int *stop, hash_list_t *p_hash_list)
+        :n_buckets(n_buckets), initial(initial), nb_threads(nb_threads), update(update),
+         range(range), variation(0), result_add(0), result_remove(0),
+         result_contains(0), result_found(0), stop(stop), p_hash_list(p_hash_list)
+        {
+            rand_init(seed);
+        }
+
+    NEW_DELETE_OPS(thread_param);
 } thread_param_t;
-
-uint64_t
-u_rand(void)
-{
-  uint64_t t = rdtsc() / 2;
-  return (t >= 0) ? t : 0 - t;
-}
-
-
-// Return a random integer between a given range.
-int randomrange(int lo, int hi)
-{
-  if (hi < lo) {
-    int tmp = lo;
-    lo = hi;
-    hi = tmp;
-  }
-  int range = hi - lo + 1;
-  return u_rand() % (range) + lo;
-}
 
 
 void test(void* param)
@@ -225,8 +261,8 @@ void test(void* param)
 
     while (*p_data->stop == 0)
     {
-        op = randomrange(1, 1000);
-        value = randomrange(1, p_data->range);
+        op = rand_range(1000, p_data->seed);
+        value = rand_range(p_data->range, p_data->seed);
         bucket = HASH_VALUE(p_hash_list, value);
         list_t *p_list = p_hash_list->buckets[bucket];
         // p_list = p_list;
@@ -269,7 +305,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     cprintf("Run Kernel Level Benchmark\n");
 
 
-    thread_param_t *param_list;
+    thread_param_t **param_list;
     hash_list_t *p_hash_list;
     struct proc** thread_list;
     int stop = 0;
@@ -300,7 +336,8 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
         return;
     }
 
-    param_list = (thread_param_t *)kmalloc(nb_threads*sizeof(thread_param_t), "params");
+    param_list = (thread_param_t **)kmalloc(nb_threads*sizeof(thread_param_t*), "params");
+    param_list = new thread_param *[nb_threads];
     if (param_list == NULL) {
         cprintf("param_list init error\n");
         return;
@@ -311,18 +348,16 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     cprintf("Creating %d threads...", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
-        param_list[i].n_buckets = n_buckets;
-        param_list[i].initial = initial;
-        param_list[i].nb_threads = nb_threads;
-        param_list[i].update = update;
-        param_list[i].range = range;
-        param_list[i].stop = &stop;
-        param_list[i].variation = 0;
-        param_list[i].p_hash_list = p_hash_list;
+        param_list[i] = new thread_param(n_buckets, initial, nb_threads, update, range,
+                                         &stop, p_hash_list);
+    }
 
-        thread_list[i] = threadpin(test, (void*)&param_list[i], "test_thread", i%(ncpu-1)+1);
+    for (int i = 0; i < nb_threads; i++)
+    {
+        thread_list[i] = threadpin(test, (void*)param_list[i], "test_thread", i%(ncpu-1)+1);
         cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(ncpu-1)+1, thread_list[i]->get_state());
     }
+
     cprintf(" done!\n");
 
     {
@@ -349,13 +384,13 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     cprintf( "\n####result####\n");
 	for (int i = 0; i < nb_threads; i++) {
 		cprintf( "Thread %d\n", i);
-		cprintf( "  #add        : %d\n", param_list[i].result_add);
-		cprintf( "  #remove     : %d\n", param_list[i].result_remove);
-		cprintf( "  #contains   : %d\n", param_list[i].result_contains);
-		cprintf( "  #found      : %d\n", param_list[i].result_found);
-		reads += param_list[i].result_found;
-		updates += (param_list[i].result_add + param_list[i].result_remove);
-		total_variation += param_list[i].variation;
+		cprintf( "  #add        : %d\n", param_list[i]->result_add);
+		cprintf( "  #remove     : %d\n", param_list[i]->result_remove);
+		cprintf( "  #contains   : %d\n", param_list[i]->result_contains);
+		cprintf( "  #found      : %d\n", param_list[i]->result_found);
+		reads += param_list[i]->result_found;
+		updates += (param_list[i]->result_add + param_list[i]->result_remove);
+		total_variation += param_list[i]->variation;
 	}
     total_size = 0;
     for(int i = 0; i < n_buckets; i++)
