@@ -11,6 +11,7 @@
 #include "futex.h"
 #include "version.hh"
 #include "filetable.hh"
+#include "cpputil.hh"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
@@ -20,19 +21,160 @@
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
 
+int randomrange(int lo, int hi);
+
 typedef struct node {
     int value;
     struct node *next;
+
+    NEW_DELETE_OPS(node);
 } node_t;
 
 typedef struct list {
     spinlock lk;
     node_t *head;
+
+    list(void): lk("list_lock"), head(NULL) {}
+    ~list(void) {
+        for (node_t *iter  = head; iter != NULL;)
+        {
+            node_t *trash = iter;
+            iter = iter->next;
+            delete trash;
+        }
+    }
+    NEW_DELETE_OPS(list);
+    // insert without lock
+    int raw_insert(int key) {
+        node_t *prev = NULL, *cur = NULL, *new_node = NULL;
+        int ret = 1;
+
+        if(head == NULL)
+        {
+            new_node = new node_t;
+            new_node->next = NULL;
+            new_node->value = key;
+            head = new_node;
+
+            return ret;
+        }
+
+        prev = head;
+        cur = prev->next;
+        for (; cur != NULL; prev = cur, cur = cur->next)
+        {
+            if (cur->value == key)
+            {
+                ret = 0;
+                break;
+            }
+        }
+
+        if(ret){
+            //no node with key value
+            new_node = new node_t;
+            new_node->next = NULL;
+            new_node->value = key;
+            prev->next = new_node;
+        }
+
+        return ret;
+    }
+
+    int list_insert(int key) {
+        scoped_acquire l(&lk);
+        return raw_insert(key);
+    }
+
+    int list_delete(int key) {
+        node_t *prev, *cur;
+        int ret = 0;
+
+        scoped_acquire l(&lk);
+
+        if(head == NULL){
+            return ret;
+        }
+        else{
+            prev = head;
+            cur = prev->next;
+            for(; cur!=NULL; prev=cur, cur=cur->next)
+            {
+                if(cur->value == key){
+                    ret = 1;
+                    break;
+                }
+            }
+        }
+
+        if(ret)
+        {
+            //node to delete with key value
+            prev->next = cur->next;
+            delete cur;
+            // cprintf( "delete node value : %d\tpid : %d\n", key, getpid());
+        }
+        // else{
+        // cprintf( "nothing to delete %d\t pid : %d\n", key, getpid());
+        // }
+        return ret;
+    }
+
+    int list_find(int key) {
+        node_t *prev = NULL, *cur = NULL;
+        int ret = 0, val;
+
+        scoped_acquire l(&lk);
+
+        for (prev = head, cur = prev->next; cur != NULL;
+             prev = cur, cur = cur->next)
+        {
+            if ((val = cur->value) == key)
+            {
+                ret = (val == key);
+                break;
+            }
+        }
+        return ret;
+    }
+
 } list_t;
 
 typedef struct hash_list {
-	int n_buckets;
-	list_t *buckets[MAX_BUCKETS];  
+    int n_buckets;
+    list_t *buckets[MAX_BUCKETS];  
+
+    hash_list(int n_buc, int initial, int range): n_buckets(n_buc) {
+        for (int i = 0; i < n_buckets; i++) {
+            list_t *list = new list_t;
+            if (list == NULL) {
+                cprintf("spinlock_list init error\n");
+                return;
+            }
+            buckets[i] = list;
+        }
+        cprintf("initialize %d nodes...", initial);
+        int j = 0;
+        while (j < initial)
+        {
+            int value = randomrange(1, range);
+            int bucket = HASH_VALUE(this, value);
+
+            if (buckets[bucket]->raw_insert(value))
+            {
+                j++;
+            }
+        }
+        cprintf("done\n");
+    }
+
+    ~hash_list(void) {
+        for (int i = 0; i < n_buckets; i++)
+        {
+            delete buckets[i];
+        }
+    }
+    NEW_DELETE_OPS(hash_list);
 } hash_list_t;
 
 typedef struct thread_param {
@@ -71,106 +213,6 @@ int randomrange(int lo, int hi)
 }
 
 
-
-int list_insert(int key, list_t *list)
-{
-    node_t *prev = NULL, *cur = NULL, *new_node = NULL;
-    int ret = 1;
-
-    list->lk.acquire();
-
-    if(list->head == NULL)
-    {
-        new_node = (node_t*)kmalloc(sizeof(node_t), "node");
-        new_node->next = NULL;
-        new_node->value = key;
-        list->head = new_node;
-
-        list->lk.release();
-        return ret;
-    }
-
-    prev = list->head;
-    cur = prev->next;
-    for (; cur != NULL; prev = cur, cur = cur->next)
-    {
-        if (cur->value == key)
-        {
-            ret = 0;
-            break;
-        }
-    }
-
-    if(ret){
-        //no node with key value
-        new_node = (node_t*)kmalloc(sizeof(node_t), "node");
-        new_node->next = NULL;
-        new_node->value = key;
-        prev->next = new_node;
-    }
-
-    list->lk.release();
-
-    return ret;
-}
-
-int list_delete(int key, list_t *list)
-{
-    node_t *prev, *cur;
-    int ret = 0;
-    list->lk.acquire();
-
-    if(list->head == NULL){
-        list->lk.release();
-        return ret;
-    }
-    else{
-        prev = list->head;
-        cur = prev->next;
-        for(; cur!=NULL; prev=cur, cur=cur->next)
-        {
-            if(cur->value == key){
-                ret = 1;
-                break;
-            }
-        }
-    }
-
-    if(ret)
-    {
-        //node to delete with key value
-        prev->next = cur->next;
-        kmfree((void*)cur, sizeof(node_t));
-        // cprintf( "delete node value : %d\tpid : %d\n", key, getpid());
-    }
-    else{
-        // cprintf( "nothing to delete %d\t pid : %d\n", key, getpid());
-    }
-    list->lk.release();
-
-    return ret;
-}
-
-int list_find(int key, list_t *list)
-{
-    node_t *prev = NULL, *cur = NULL;
-    int ret = 0, val;
-
-    list->lk.acquire();
-
-    for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
-    {
-        if ((val = cur->value) == key)
-        {
-            ret = (val == key);
-            break;
-        }
-    }
-    list->lk.release();
-
-    return ret;
-}
-
 void test(void* param)
 {
     int op, bucket, value;
@@ -192,7 +234,7 @@ void test(void* param)
         {
             if ((op & 0x01) == 0)
             {
-                if (list_insert(value, p_list))
+                if (p_list->list_insert(value))
                 {
                     p_data->variation++;
                 }
@@ -200,7 +242,7 @@ void test(void* param)
             }
             else
             {
-                if (list_delete(value, p_list))
+                if (p_list->list_delete(value))
                 {
                     p_data->variation--;
                 }
@@ -209,7 +251,7 @@ void test(void* param)
         }
         else
         {
-            if(list_find(value, p_list))
+            if(p_list->list_find(value))
             {
                 p_data->result_contains++;
             }
@@ -250,39 +292,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 	assert(update >= 0 && update <= 1000);
 	assert(range > 0 && range >= initial);
 
-    p_hash_list = (hash_list_t *)kmalloc(sizeof(hash_list_t), "hashlist");
-    if (p_hash_list == NULL) {
-	    cprintf("hash_list init error\n");
-	    return;
-	}
-    p_hash_list->n_buckets = n_buckets;
-
-    for (int i = 0; i < p_hash_list->n_buckets; i++) {
-        list_t *list;
-        list = (list_t *)kmalloc(sizeof(list_t), "lists");
-        if (list == NULL) {
-            cprintf("spinlock_list init error\n");
-            return;
-        }
-        list->head = NULL;
-        // lock_init(&list->lk);
-        list->lk = spinlock("list_lock");
-        p_hash_list->buckets[i] = list;
-    }
-
-    cprintf("initialize %d nodes...", initial);
-    int j = 0;
-    while (j < initial)
-    {
-        int value = randomrange(1, range);
-        int bucket = HASH_VALUE(p_hash_list, value);
-
-        if (list_insert(value, p_hash_list->buckets[bucket]))
-        {
-            j++;
-        }
-    }
-    cprintf("done\n");
+    p_hash_list = new hash_list(n_buckets, initial, range);
 
     thread_list = (struct proc**)kmalloc(nb_threads*sizeof(struct proc*), "threads");
     if (thread_list == NULL) {
