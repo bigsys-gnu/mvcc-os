@@ -17,6 +17,8 @@
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
+#include "mvrlu/port-kernel.h"
+
 #define MAX_BUCKETS (128)
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
