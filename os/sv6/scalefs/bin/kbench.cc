@@ -18,6 +18,18 @@
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
 
+void
+usage(const char *argv0)
+{
+  fprintf(stderr, "Usage: %s [options] nthreads\n", argv0);
+  fprintf(stderr, "  -b the number of buckets\n");
+  fprintf(stderr, "  -i the number of initial nodes\n");
+  fprintf(stderr, "  -t the number of threads\n");
+  fprintf(stderr, "  -d micro seconds of benchmark\n");
+  fprintf(stderr, "  -u update ratio (20 is 2%%)\n");
+  fprintf(stderr, "  -r the range of random numbers\n");
+  exit(2);
+}
 
 int
 main(int argc, char **argv)
@@ -30,31 +42,33 @@ main(int argc, char **argv)
 	int update = DEFAULT_UPDATE;
 	int range = DEFAULT_RANGE;
 
-    switch (argc - 1)
+    int opt;
+    while ((opt = getopt(argc, argv, "b:i:t:d:u:r:")) != -1)
     {
-    case 6:
-        range = atoi(argv[6]);
-    case 5:
-        update = atoi(argv[5]);
-    case 4:
-        duration = atoi(argv[4]);
-    case 3:
-        n_buckets = atoi(argv[3]);
-    case 2:
-        initial = atoi(argv[2]);
-    case 1:
-        nb_threads = atoi(argv[1]);
-    default:
-        printf("%d Option is inserted\n", argc - 1);
-        break;
+        switch (opt)
+        {
+        case 'r':
+            range = atoi(optarg);
+            break;
+        case 'u':
+            update = atoi(optarg);
+            break;
+        case 'd':
+            duration = atoi(optarg);
+            break;
+        case 't':
+            nb_threads = atoi(optarg);
+            break;
+        case 'i':
+            initial = atoi(optarg);
+            break;
+        case 'b':
+            n_buckets = atoi(optarg);
+            break;
+        default:
+            usage(argv[0]);
+        }
     }
-    printf("-Nb threads   : %d\n", nb_threads);
-    printf("-Initial size : %d\n", initial);
-    printf("-Buckets      : %d\n", n_buckets);
-    printf("-Duration     : %d\n", duration);
-    printf("-Update rate  : %d\n", update);
-    printf("-range        : %d\n", range);
-    printf("-Set type     : hash-list\n");
 
 	assert(n_buckets >= 1);
 	assert(duration >= 0);
@@ -62,6 +76,15 @@ main(int argc, char **argv)
 	assert(nb_threads > 0);
 	assert(update >= 0 && update <= 1000);
 	assert(range > 0 && range >= initial);
+    assert(n_buckets < range);
+
+    printf("-t #threads   : %d\n", nb_threads);
+    printf("-i Initial size : %d\n", initial);
+    printf("-b Buckets      : %d\n", n_buckets);
+    printf("-d Duration     : %d\n", duration);
+    printf("-u Update rate  : %d\n", update);
+    printf("-r Range        : %d\n", range);
+    printf("-Set type     : hash-list\n");
 
 
     benchmark(
