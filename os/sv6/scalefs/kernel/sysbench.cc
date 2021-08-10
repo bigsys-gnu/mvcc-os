@@ -62,14 +62,13 @@ static inline int rand_range(int n, unsigned short *seed)
   return v;
 }
 
-int randomrange(int lo, int hi);
-
 typedef struct node {
     int value;
     struct node *next;
 
     NEW_DELETE_OPS(node);
 } node_t;
+
 
 typedef struct list {
     spinlock lk;
@@ -330,13 +329,12 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 
     p_hash_list = new hash_list(n_buckets, initial, range);
 
-    thread_list = (struct proc**)kmalloc(nb_threads*sizeof(struct proc*), "threads");
+    thread_list = new struct proc *[nb_threads];
     if (thread_list == NULL) {
         cprintf("thread_list init error\n");
         return;
     }
 
-    param_list = (thread_param_t **)kmalloc(nb_threads*sizeof(thread_param_t*), "params");
     param_list = new thread_param *[nb_threads];
     if (param_list == NULL) {
         cprintf("param_list init error\n");
@@ -376,8 +374,6 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     for(int i = 0; i < nb_threads; i++)
     {
         wait(-1, NULL);
-        // thread_join();
-        // sleep(0);
     }
     cprintf(" done!\n");
 
@@ -423,7 +419,14 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 		cprintf("\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", (int)exp, (int)total_size);
     }
 
-
+    // free kernel memory usage
+    delete p_hash_list;
+    delete[] thread_list;
+    for (int i = 0; i < nb_threads; i++)
+    {
+        delete param_list[i];
+    }
+    delete[] param_list;
 
     cprintf("Kernel Level Benchmark END\n");
 }
