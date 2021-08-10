@@ -362,18 +362,8 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 	assert(range > 0 && range >= initial);
 
     p_hash_list = new hash_list(n_buckets, initial, range, SPINLOCK);
-
     thread_list = new struct proc *[nb_threads];
-    if (thread_list == NULL) {
-        cprintf("thread_list init error\n");
-        return;
-    }
-
     param_list = new thread_param *[nb_threads];
-    if (param_list == NULL) {
-        cprintf("param_list init error\n");
-        return;
-    }
    
     initial_time = nsectime();
     cprintf("Main thread ID: %d\n", myproc()->pid);
