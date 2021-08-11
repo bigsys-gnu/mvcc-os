@@ -352,7 +352,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 	int n_buckets = buck;
 	int initial = init;
 	int nb_threads = th;
-	int duration = dur;
+	u64 duration = dur;
 	int update = upd;
 	int range = rng;
 
@@ -390,7 +390,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
         u64 until = initial_time + duration * 1000000;
 
         scoped_acquire l(&tmp);
-        while(until > nsectime())
+        if(until > nsectime())
             cond.sleep_to(&tmp, until);
 
         stop = 1;
