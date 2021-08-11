@@ -23,12 +23,38 @@
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
 
+/////////////////////////////////////////////////////////
+// Headers
+/////////////////////////////////////////////////////////
 enum SYN_TYPE {
     SPINLOCK,
     RCU,
     RLU,
     MVRLU,
 };
+struct node;
+struct list;
+struct hash_list;
+struct thread_param;
+struct spinlock_list;
+struct spin_thread_param;
+
+list *
+get_list(struct bench_trait);
+struct thread_param *
+get_thread_data(struct bench_trait);
+
+struct spin_thread_param;
+list *
+get_list(struct spinlock_trait);
+struct thread_param *
+get_thread_data(struct spinlock_trait);
+
+/////////////////////////////////////////////////////////
+// Benchmark Traits
+/////////////////////////////////////////////////////////
+struct bench_trait {};
+struct spinlock_trait : public bench_trait {};
 /////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
 /////////////////////////////////////////////////////////
@@ -71,9 +97,13 @@ static inline int rand_range(int n, unsigned short *seed)
   return v;
 }
 
+/////////////////////////////////////////////////////////
+// Normal Data Structures
+/////////////////////////////////////////////////////////
 typedef struct node {
     int value;
     struct node *next;
+    virtual ~node(void) {}
 
     NEW_DELETE_OPS(node);
 } node_t;
@@ -92,15 +122,21 @@ typedef struct list {
             delete trash;
         }
     }
+    virtual int list_insert(int key) = 0;
+    virtual int list_delete(int key) = 0;
+    virtual int list_find(int key) = 0;
+    virtual int raw_insert(int key) = 0;
 
+protected:
     // insert without lock
-    int raw_insert(int key) {
-        node_t *prev = NULL, *cur = NULL, *new_node = NULL;
+    template <typename T>
+    int inner_raw_insert(int key) {
+        T *prev = NULL, *cur = NULL, *new_node = NULL;
         int ret = 1;
 
         if(head == NULL)
         {
-            new_node = new node_t;
+            new_node = new T;
             new_node->next = NULL;
             new_node->value = key;
             head = new_node;
@@ -121,7 +157,7 @@ typedef struct list {
 
         if(ret){
             //no node with key value
-            new_node = new node_t;
+            new_node = new T;
             new_node->next = NULL;
             new_node->value = key;
             prev->next = new_node;
@@ -129,100 +165,17 @@ typedef struct list {
 
         return ret;
     }
-    virtual int list_insert(int key) = 0;
-    virtual int list_delete(int key) = 0;
-    virtual int list_find(int key) = 0;
 
 } list_t;
-
-
-struct spinlock_list : public list {
-    spinlock lk;
-
-    spinlock_list(void): list(), lk("list_lock") {}
-
-    int list_insert(int key) override {
-        scoped_acquire l(&lk);
-        return raw_insert(key);
-    }
-
-    int list_delete(int key) override {
-        node_t *prev, *cur;
-        int ret = 0;
-
-        scoped_acquire l(&lk);
-
-        if(head == NULL){
-            return ret;
-        }
-        else{
-            prev = head;
-            cur = prev->next;
-            for(; cur!=NULL; prev=cur, cur=cur->next)
-            {
-                if(cur->value == key){
-                    ret = 1;
-                    break;
-                }
-            }
-        }
-
-        if(ret)
-        {
-            //node to delete with key value
-            prev->next = cur->next;
-            delete cur;
-            // cprintf( "delete node value : %d\tpid : %d\n", key, getpid());
-        }
-        // else{
-        // cprintf( "nothing to delete %d\t pid : %d\n", key, getpid());
-        // }
-        return ret;
-    }
-
-    int list_find(int key) override {
-        node_t *prev = NULL, *cur = NULL;
-        int ret = 0, val;
-
-        scoped_acquire l(&lk);
-
-        for (prev = head, cur = prev->next; cur != NULL;
-             prev = cur, cur = cur->next)
-        {
-            if ((val = cur->value) == key)
-            {
-                ret = (val == key);
-                break;
-            }
-        }
-        return ret;
-    }
-
-    NEW_DELETE_OPS(spinlock_list);
-};
-
-list_t *
-get_list(enum SYN_TYPE type)
-{
-    switch(type){
-    case SPINLOCK:
-        return static_cast<list *>(new spinlock_list);
-    case RCU:
-    case RLU:
-    case MVRLU:
-        return NULL;
-    default:
-        return NULL;
-    }
-}
 
 typedef struct hash_list {
     int n_buckets;
     list_t *buckets[MAX_BUCKETS];  
 
-    hash_list(int n_buc, int initial, int range, enum SYN_TYPE type): n_buckets(n_buc) {
+    // initializer for spinlock
+    hash_list(int n_buc, int initial, int range, spinlock_trait trait): n_buckets(n_buc) {
         for (int i = 0; i < n_buckets; i++) {
-            list_t *list = get_list(type);
+            list_t *list = get_list(trait);
             if (list == NULL) {
                 cprintf("spinlock_list init error\n");
                 return;
@@ -279,10 +232,110 @@ typedef struct thread_param {
         {
             rand_init(seed);
         }
+    virtual ~thread_param(void) {}
 
     NEW_DELETE_OPS(thread_param);
 } thread_param_t;
+/////////////////////////////////////////////////////////
+// HELPER FUNCTIONS
+/////////////////////////////////////////////////////////
+list_t *
+get_list(struct bench_trait) {
+    return NULL;
+}
 
+struct thread_param *
+get_thread_data(int n_buckets, int initial, int nb_threads, int update, int range,
+                int *stop, hash_list *p_hash_list, struct bench_trait) {
+    return new thread_param(n_buckets, initial, nb_threads, update,
+                            range, stop, p_hash_list);
+}
+/////////////////////////////////////////////////////////
+// Benchmark Specific
+/////////////////////////////////////////////////////////
+
+/* Spinlock */
+struct spinlock_list : public list {
+    spinlock lk;
+
+    spinlock_list(void): list(), lk("list_lock") {}
+
+    int list_insert(int key) override {
+        scoped_acquire l(&lk);
+        return inner_raw_insert<node_t>(key);
+    }
+
+    int list_delete(int key) override {
+        node_t *prev, *cur;
+        int ret = 0;
+
+        scoped_acquire l(&lk);
+
+        if(head == NULL){
+            return ret;
+        }
+        else{
+            prev = head;
+            cur = prev->next;
+            for(; cur!=NULL; prev=cur, cur=cur->next)
+            {
+                if(cur->value == key){
+                    ret = 1;
+                    break;
+                }
+            }
+        }
+
+        if(ret)
+        {
+            //node to delete with key value
+            prev->next = cur->next;
+            delete cur;
+            // cprintf( "delete node value : %d\tpid : %d\n", key, getpid());
+        }
+        // else{
+        // cprintf( "nothing to delete %d\t pid : %d\n", key, getpid());
+        // }
+        return ret;
+    }
+
+    int list_find(int key) override {
+        node_t *prev = NULL, *cur = NULL;
+        int ret = 0, val;
+
+        scoped_acquire l(&lk);
+
+        for (prev = head, cur = prev->next; cur != NULL;
+             prev = cur, cur = cur->next)
+        {
+            if ((val = cur->value) == key)
+            {
+                ret = (val == key);
+                break;
+            }
+        }
+        return ret;
+    }
+
+    int raw_insert(int key) {
+        return inner_raw_insert<node_t>(key);
+    }
+
+    NEW_DELETE_OPS(spinlock_list);
+};
+
+list_t *
+get_list(struct spinlock_trait) {
+    return static_cast<list_t *>(new spinlock_list);
+}
+
+struct thread_param *
+get_thread_data(int n_buckets, int initial, int nb_threads, int update, int range,
+                int *stop, hash_list *p_hash_list, struct spinlock_trait) {
+    return new thread_param(n_buckets, initial, nb_threads, update,
+                            range, stop, p_hash_list);
+}
+/* Spinlock */
 
 void test(void* param)
 {
@@ -332,13 +385,11 @@ void test(void* param)
 }
 
 
-
 //SYSCALL
 void
 sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 {
     cprintf("Run Kernel Level Benchmark\n");
-
 
     thread_param_t **param_list;
     hash_list_t *p_hash_list;
@@ -348,6 +399,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     unsigned long exp = 0, total_variation = 0, total_size = 0;
     unsigned long reads = 0, updates = 0;
     unsigned long iv = 0, fv = 0;
+    enum SYN_TYPE type = SPINLOCK;
 
 	int n_buckets = buck;
 	int initial = init;
@@ -363,7 +415,14 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 	assert(update >= 0 && update <= 1000);
 	assert(range > 0 && range >= initial);
 
-    p_hash_list = new hash_list(n_buckets, initial, range, SPINLOCK);
+    switch (type) {
+    case SPINLOCK:
+        p_hash_list = new hash_list(n_buckets, initial, range, spinlock_trait());
+        break;
+    default:
+        break;
+    }
+
     thread_list = new struct proc *[nb_threads];
     param_list = new thread_param *[nb_threads];
    
@@ -372,8 +431,8 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     cprintf("Creating %d threads...", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
-        param_list[i] = new thread_param(n_buckets, initial, nb_threads, update, range,
-                                         &stop, p_hash_list);
+        param_list[i] = get_thread_data(n_buckets, initial, nb_threads, update, range,
+                                        &stop, p_hash_list, spinlock_trait());
     }
 
     for (int i = 0; i < nb_threads; i++)
