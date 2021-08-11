@@ -83,7 +83,7 @@ OBJS = \
 	disk.o \
 	zlib-decompress.o \
 
-# include kernel/Makefrag.mvrlu
+include kernel/Makefrag.mvrlu
 
 OBJS := $(addprefix $(O)/kernel/, $(OBJS))
 

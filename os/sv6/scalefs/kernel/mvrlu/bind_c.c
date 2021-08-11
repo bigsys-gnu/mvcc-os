@@ -110,7 +110,8 @@ inline void port_cond_destroy(struct completion *cond)
  */
 
 inline int port_create_thread(const char *name, struct task_struct **t,
-                              int (*fn)(void *), void *arg, struct completion *completion)
+                              void (*fn)(void *), void *arg,
+                              struct completion *completion)
 {
   return __port_create_thread(name, t, fn, arg, completion);
 }

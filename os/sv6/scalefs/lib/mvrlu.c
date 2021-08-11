@@ -1,9 +1,4 @@
-#ifndef __KERNEL__
 #include "mvrlu/mvrlu.h"
-#else
-#include <linux/mvrlu.h>
-#endif
-
 #include "mvrlu/mvrlu_i.h"
 #include "mvrlu/debug.h"
 #include "mvrlu/arch.h"

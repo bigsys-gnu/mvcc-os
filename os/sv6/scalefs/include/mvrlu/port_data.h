@@ -4,6 +4,10 @@
  * Data Types
  */
 
+struct task_struct {
+  int val;
+};
+
 typedef struct {
   void *spin_obj;
 } spinlock_t;

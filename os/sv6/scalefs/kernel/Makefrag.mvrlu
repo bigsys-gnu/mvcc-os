@@ -1,4 +1,4 @@
-MVRLU_OBJS = $(addsuffix .o, port-kernel bind_c)
+MVRLU_OBJS = $(addsuffix .o, port-kernel bind_c mvrlu)
 MVRLU_OBJS := $(addprefix mvrlu/, ${MVRLU_OBJS})
 
 OBJS += ${MVRLU_OBJS}

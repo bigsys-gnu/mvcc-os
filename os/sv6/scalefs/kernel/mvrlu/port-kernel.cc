@@ -41,7 +41,7 @@ inline void __port_free_log_mem(void *addr)
 
 inline int __port_addr_in_log_region(void *addr__)
 {
-	unsigned long addr = (unsigned long)addr__;
+	// unsigned long addr = (unsigned long)addr__;
 	// return addr >= VMALLOC_START && addr < VMALLOC_END;
     return 1;                   // need fix
 }
@@ -58,14 +58,15 @@ inline void *__port_alloc_x(size_t size, unsigned int flags)
 {
   struct alloc_mem *mem;
 
-  kmalign(&mem, 4, size + sizeof(size_t), "port mem");
+  kmalign((void **)&mem, 4, size + sizeof(size_t), "port mem");
   mem->size = size + sizeof(size_t);
   return mem->byte;
 }
 
 inline void __port_free(void *ptr)
 {
-  struct alloc_mem *mem = (struct alloc_mem *)(ptr - sizeof(void *));
+  int *int_ptr = (int *)ptr;
+  struct alloc_mem *mem = (struct alloc_mem *)(int_ptr - sizeof(int *));
   kmalignfree(mem, 4, mem->size);
 }
 
@@ -109,6 +110,7 @@ inline void __port_spin_unlock(spinlock_t *lock)
 inline int __port_mutex_init(struct mutex *mutex)
 {
   mutex->mutex_obj = (void *) new spinlock("port mutex");
+  return 1;
 }
 
 inline int __port_mutex_destroy(struct mutex *mutex)
@@ -117,29 +119,33 @@ inline int __port_mutex_destroy(struct mutex *mutex)
 
   if (l)
     delete l;
+
+  return 1;
 }
 
 inline int __port_mutex_lock(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
   l->acquire();
+  return 1;
 }
 
 inline int __port_mutex_unlock(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
   l->release();
+  return 1;
 }
 
 inline void __port_cond_init(struct completion *cond)
 {
-  cond->cond_obj = (void *) new condvar("port cond")
+  cond->cond_obj = (void *) new condvar("port cond");
 }
 
 inline void __port_cond_destroy(struct completion *cond)
 {
-  condvar *cond = (condvar *)cond->cond_obj;
-  delete cond;
+  condvar *cond_var = (condvar *)cond->cond_obj;
+  delete cond_var;
 }
 
 /*
@@ -147,22 +153,22 @@ inline void __port_cond_destroy(struct completion *cond)
  */
 
 int __port_create_thread(const char *name, struct task_struct **t,
-                              int (*fn)(void *), void *arg,
-                              struct completion *completion)
+                         void (*fn)(void *), void *arg,
+                         struct completion *completion)
 {
   struct proc *temp = threadalloc(fn, arg);
   if (temp != NULL)
   {
-    port_cond_init(completion);
+    __port_cond_init(completion);
 
     {
       scoped_acquire l(&temp->lock);
       addrun(temp);
     }
-    *t = temp;
+    *t = (struct task_struct *)temp;
     return 0;
   }
-  return -11
+  return -11;
 }
 
 void __port_finish_thread(struct completion *completion)
@@ -197,13 +203,11 @@ inline void __port_initiate_nap(struct mutex *mutex, struct completion *cond,
   cond->cond_obj = (void *) cond_var;
 
   {
-    struct spinlock *mutex = (struct spinlock *)mutex->mutex_obj;
+    struct spinlock *spin = (struct spinlock *)mutex->mutex_obj;
     u64 until = nsectime() + usecs * 1000000;
 
-    scoped_acquire l(mutex);
+    scoped_acquire l(spin);
     if (until > nsectime())
-      cond.sleep_to(mutex, until);
-
-    stop = 1;
+      cond_var->sleep_to(spin, until);
   }
 }
