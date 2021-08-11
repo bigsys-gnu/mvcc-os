@@ -33,7 +33,7 @@ inline int port_addr_in_log_region(void *addr__)
 
 inline void *port_alloc_x(size_t size, unsigned int flags)
 {
-  return __portA_alloc_x(size, flags);
+  return __port_alloc_x(size, flags);
 }
 
 inline void port_free(void *ptr)

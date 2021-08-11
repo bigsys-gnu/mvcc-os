@@ -1,21 +1,7 @@
 #ifndef BIND_C_H
 #define BIND_C_H
 
-/*
- * Data Types
- */
-
-typedef struct {
-  void *spin_obj;
-} spinlock_t;
-
-struct mutex {
-  void *mutex_obj;
-};
-
-struct completion {
-  void *cond_obj;
-};
+#include "port_data.h"
 
 /*
  *  logs
