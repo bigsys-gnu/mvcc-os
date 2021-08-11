@@ -120,7 +120,7 @@ static inline void __attribute__((__always_inline__)) smp_wmb_tso(void)
 
 #define smp_fas(__ptr, __val) __sync_fetch_and_sub(__ptr, __val)
 
-#define cpu_relax() asm volatile("pause\n" : : : "memory")
+#define cpu_relax() __asm__ volatile("pause\n" : : : "memory")
 
 static inline uint64_t __attribute__((__always_inline__)) read_tsc(void)
 {

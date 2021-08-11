@@ -3,7 +3,7 @@
 
 #include <sys/mman.h>
 #include "pthread.h"
-#include "mvrlu/arch.h"
+#include "arch.h"
 
 #define __init
 #define EXPORT_SYMBOL(sym)
@@ -146,7 +146,7 @@ static inline void port_free(void *ptr)
  * Synchronization
  */
 
-#define port_cpu_relax_and_yield() cpu_relax
+#define port_cpu_relax_and_yield() cpu_relax()
 
 static inline void port_spin_init(pthread_spinlock_t *lock)
 {
