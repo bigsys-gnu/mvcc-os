@@ -3,6 +3,7 @@
 #include "spinlock.hh"
 #include "condvar.hh"
 #include "vmalloc.hh"
+#include "proc.hh"
 extern "C" {
 #include "mvrlu/port-kernel.h"
 }
@@ -131,4 +132,71 @@ inline void port_cond_init(struct completion *cond)
 inline void port_cond_destroy(struct completion *cond)
 {
   condvar *cond = (condvar *)cond->cond_obj;
+  delete cond;
+}
+
+/*
+ * Thread
+ */
+
+int port_create_thread(const char *name, struct task_struct **t,
+                              int (*fn)(void *), void *arg,
+                              struct completion *completion)
+{
+  struct proc *temp = threadalloc(fn, arg);
+  if (temp != NULL)
+  {
+    port_cond_init(completion);
+
+    {
+      scoped_acquire l(&temp->lock);
+      addrun(temp);
+    }
+    *t = temp;
+    return 0;
+  }
+  return -11
+}
+
+void port_finish_thread(struct completion *completion)
+{
+  struct condvar *cond = (struct condvar *) completion->cond_obj;
+  cond->wake_all();
+}
+
+void port_wait_for_finish(void *x, struct completion *completion)
+{
+  struct condvar *cond = (struct condvar *) completion->cond_obj;
+  struct spinlock local_lock("local");
+
+  scoped_acquire lg(&local_lock);
+  cond->sleep(&local_lock);
+}
+
+inline void port_initiate_wakeup(struct mutex *mutex, struct completion *cond)
+{
+  struct condvar *cond_var = (struct condvar *) cond->cond_obj;
+  (void)mutex;
+  cond_var->wake_all();
+}
+
+inline void port_initiate_nap(struct mutex *mutex, struct completion *cond,
+                              unsigned long usecs)
+{
+  struct condvar *cond_var = (struct condvar *) cond->cond_obj;
+
+  delete cond_var;
+  cond_var = new condvar("port cond");
+  cond->cond_obj = (void *) cond_var;
+
+  {
+    struct spinlock *mutex = (struct spinlock *)mutex->mutex_obj;
+    u64 until = nsectime() + usecs * 1000000;
+
+    scoped_acquire l(mutex);
+    if (until > nsectime())
+      cond.sleep_to(mutex, until);
+
+    stop = 1;
+  }
 }
