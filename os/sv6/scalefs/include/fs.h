@@ -15,7 +15,7 @@
 #define BLKS_PER_MEG 256
 
 #if defined(HW_qemu)
-#define NMEGS 512 // 0.5 GB
+#define NMEGS 1024 // 1 GB
 #else
 #define NMEGS 16384 // 16 GB
 #endif

@@ -11,9 +11,9 @@ TOOLPREFIX ?=
 # QEMU binary
 QEMU       ?= qemu-system-x86_64
 # Number of CPUs to emulate
-QEMUSMP    ?= 4
+QEMUSMP    ?= 6
 # RAM to simulate (in MB)
-QEMUMEM    ?= 2048
+QEMUMEM    ?= 4096
 # Default hardware build target.  See param.h for others.
 HW         ?= qemu
 # Enable C++ exception handling in the kernel.
@@ -184,7 +184,7 @@ xv6memfs.img: bootblock kernelmemfs
 	dd if=kernelmemfs of=xv6memfs.img seek=1 conv=notrunc
 
 ifeq ($(HW),qemu)
-FSEXTRA += sv6journal0 sv6journal1 sv6journal2 sv6journal3 testfile1 README
+FSEXTRA += sv6journal0 sv6journal1 sv6journal2 sv6journal3 sv6journal4 sv6journal5 testfile1 README
 else
 FSEXTRA += sv6journal* testfile1 README
 endif
