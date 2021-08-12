@@ -6,7 +6,7 @@
 #include "mvrlu/mvrlu.h"
 #include "mvrlu/mvrlu_i.h"
 
-#define MAX_BUCKETS (128)
+#define MAX_BUCKETS (2048)
 #define DEFAULT_BUCKETS                 1
 #define DEFAULT_DURATION                1000
 #define DEFAULT_UPDATE                  200
@@ -76,8 +76,8 @@ typedef struct thread_param {
   int result_found;
   int *stop;
   hash_list_t *p_hash_list;
-  rlu_thread_data_t self;
-  unsigned short seed[3];
+  rlu_thread_data_t self; // for MV-RLU
+  unsigned short seed[3]; // for MV-RLU
 } thread_param_t;
 
 static pthread_barrier_t bar;
@@ -96,19 +96,19 @@ raw_list_insert(int key, list_t *list)
 
   for (prev = list->head, cur = prev->next; cur != NULL;
        prev = cur, cur = cur->next)
+  {
+    if (key < cur->value)
     {
-      if (key < cur->value)
-        {
-          ret = 1;
-          new_node = RLU_ALLOC(sizeof(node_t));
-          new_node->value = key;
-          new_node->next = cur;
-          prev->next = new_node;
-          return ret;
-        }
-      else if (key == cur->value)
-        return ret;             /* already exists */
+      ret = 1;
+      new_node = RLU_ALLOC(sizeof(node_t));
+      new_node->value = key;
+      new_node->next = cur;
+      prev->next = new_node;
+      return ret;
     }
+    else if (key == cur->value)
+      return ret;             /* already exists */
+  }
 
   if (cur == NULL)
     {
@@ -148,12 +148,12 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
           RLU_ASSIGN_PTR(self, &new_node->next, prev->next);
           RLU_ASSIGN_PTR(self, &prev->next, new_node);
           ret = 1;
-		  break;
+		      break;
         }
       else if (cur->value == key)
-        {
-          break;             /* the key value already exists. */
-        }
+      {
+        break;             /* the key value already exists. */
+      }
     }
 
   RLU_READER_UNLOCK(self);
@@ -264,9 +264,9 @@ void *test(void* param)
         {
           if(list_find(self, value, p_list) >= 0)
             {
-              p_data->result_contains++;
+              p_data->result_found++;
             }
-          p_data->result_found++;
+          p_data->result_contains++;
         }
     }
 
@@ -406,7 +406,7 @@ int main(int argc, char **argv)
     printf("  #remove     : %d\n", param_list[i].result_remove);
     printf("  #contains   : %d\n", param_list[i].result_contains);
     printf("  #found      : %d\n", param_list[i].result_found);
-    reads += param_list[i].result_contains;
+    reads += param_list[i].result_found;
     updates += (param_list[i].result_add + param_list[i].result_remove);
     total_variation += param_list[i].variation;
   }
