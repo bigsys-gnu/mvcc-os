@@ -12,32 +12,32 @@
  */
 static unsigned long g_size __read_mostly;
 
-inline int port_log_region_init(unsigned long size, unsigned long num)
+int port_log_region_init(unsigned long size, unsigned long num)
 {
   g_size = size;
   return 0;
 }
 
-inline void port_log_region_destroy(void)
+void port_log_region_destroy(void)
 {
-	/* do nothing */
+  /* do nothing */
 }
 
-inline void *port_alloc_log_mem(void)
+void *port_alloc_log_mem(void)
 {
   return vmalloc_raw(g_size, 4, "port log");
 }
 
-inline void port_free_log_mem(void *addr)
+void port_free_log_mem(void *addr)
 {
   vmalloc_free(addr);
 }
 
-inline int port_addr_in_log_region(void *addr__)
+int port_addr_in_log_region(void *addr__)
 {
-	// unsigned long addr = (unsigned long)addr__;
-	// return addr >= VMALLOC_START && addr < VMALLOC_END;
-    return 1;                   // need fix
+  // unsigned long addr = (unsigned long)addr__;
+  // return addr >= VMALLOC_START && addr < VMALLOC_END;
+  return 1;                   // need fix
 }
 
 /*
@@ -48,7 +48,7 @@ struct alloc_mem {
   char byte[1];
 };
 
-inline void *port_alloc_x(size_t size, unsigned int flags)
+void *port_alloc_x(size_t size, unsigned int flags)
 {
   struct alloc_mem *mem;
 
@@ -57,25 +57,25 @@ inline void *port_alloc_x(size_t size, unsigned int flags)
   return mem->byte;
 }
 
-inline void port_free(void *ptr)
+void port_free(void *ptr)
 {
   int *int_ptr = (int *)ptr;
   struct alloc_mem *mem = (struct alloc_mem *)(int_ptr - sizeof(int *));
   kmalignfree(mem, 4, mem->size);
 }
 
-inline void port_cpu_relax_and_yield(void)
+void port_cpu_relax_and_yield(void)
 {
   yield();
   cpu_relax();
 }
 
-inline void port_spin_init(spinlock_t *lock)
+void port_spin_init(spinlock_t *lock)
 {
   lock->spin_obj = (void *) new spinlock("port lock");
 }
 
-inline void port_spin_destroy(spinlock_t *lock)
+void port_spin_destroy(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
 
@@ -83,31 +83,31 @@ inline void port_spin_destroy(spinlock_t *lock)
     delete l;
 }
 
-inline void port_spin_lock(spinlock_t *lock)
+void port_spin_lock(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
   l->acquire();
 }
 
-inline int port_spin_trylock(spinlock_t *lock)
+int port_spin_trylock(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
   return l->try_acquire();
 }
 
-inline void port_spin_unlock(spinlock_t *lock)
+void port_spin_unlock(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
   return l->release();
 }
 
-inline int port_mutex_init(struct mutex *mutex)
+int port_mutex_init(struct mutex *mutex)
 {
   mutex->mutex_obj = (void *) new spinlock("port mutex");
   return 1;
 }
 
-inline int port_mutex_destroy(struct mutex *mutex)
+int port_mutex_destroy(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
 
@@ -117,26 +117,26 @@ inline int port_mutex_destroy(struct mutex *mutex)
   return 1;
 }
 
-inline int port_mutex_lock(struct mutex *mutex)
+int port_mutex_lock(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
   l->acquire();
   return 1;
 }
 
-inline int port_mutex_unlock(struct mutex *mutex)
+int port_mutex_unlock(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
   l->release();
   return 1;
 }
 
-inline void port_cond_init(struct completion *cond)
+void port_cond_init(struct completion *cond)
 {
   cond->cond_obj = (void *) new condvar("port cond");
 }
 
-inline void port_cond_destroy(struct completion *cond)
+void port_cond_destroy(struct completion *cond)
 {
   condvar *cond_var = (condvar *)cond->cond_obj;
   delete cond_var;
@@ -147,8 +147,8 @@ inline void port_cond_destroy(struct completion *cond)
  */
 
 int port_create_thread(const char *name, struct task_struct **t,
-                         void (*fn)(void *), void *arg,
-                         struct completion *completion)
+                       void (*fn)(void *), void *arg,
+                       struct completion *completion)
 {
   struct proc *temp = threadalloc(fn, arg);
   if (temp != NULL)
@@ -180,15 +180,15 @@ void port_wait_for_finish(void *x, struct completion *completion)
   cond->sleep(&local_lock);
 }
 
-inline void port_initiate_wakeup(struct mutex *mutex, struct completion *cond)
+void port_initiate_wakeup(struct mutex *mutex, struct completion *cond)
 {
   struct condvar *cond_var = (struct condvar *) cond->cond_obj;
   (void)mutex;
   cond_var->wake_all();
 }
 
-inline void port_initiate_nap(struct mutex *mutex, struct completion *cond,
-                              unsigned long usecs)
+void port_initiate_nap(struct mutex *mutex, struct completion *cond,
+                       unsigned long usecs)
 {
   struct condvar *cond_var = (struct condvar *) cond->cond_obj;
 
