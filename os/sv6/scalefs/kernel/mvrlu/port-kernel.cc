@@ -9,6 +9,8 @@ extern "C" {
 #include "mvrlu/bind_c.h"
 }
 
+#define __KERNEL__
+
 void test_mvrlu(void) {
   cprintf("mvrlu makefile\n");
 }

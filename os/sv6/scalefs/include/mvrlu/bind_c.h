@@ -42,7 +42,7 @@ void __port_cond_destroy(struct completion *cond);
  */
 
 int __port_create_thread(const char *name, struct task_struct **t,
-                       int (*fn)(void *), void *arg, struct completion *completion);
+                       void (*fn)(void *), void *arg, struct completion *completion);
 
 void __port_finish_thread(struct completion *completion);
 
