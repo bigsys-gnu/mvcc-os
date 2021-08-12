@@ -1,3 +1,5 @@
+#define __KERNEL__
+
 #include "types.h"
 #include "kernel.hh"
 #include "spinlock.hh"
@@ -8,8 +10,6 @@
 extern "C" {
 #include "mvrlu/bind_c.h"
 }
-
-#define __KERNEL__
 
 void test_mvrlu(void) {
   cprintf("mvrlu makefile\n");

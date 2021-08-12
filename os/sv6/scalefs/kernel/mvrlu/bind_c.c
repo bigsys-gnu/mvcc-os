@@ -1,6 +1,7 @@
+#define __KERNEL__
+
 #include "mvrlu/port-kernel.h"
 #include "mvrlu/bind_c.h"
-
 
 inline int port_log_region_init(unsigned long size, unsigned long num)
 {
