@@ -1,5 +1,3 @@
-#define __KERNEL__
-
 #include "mvrlu/mvrlu.h"
 #include "mvrlu/mvrlu_i.h"
 #include "mvrlu/debug.h"

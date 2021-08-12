@@ -1,5 +1,3 @@
-#define __KERNEL__
-
 #include "types.h"
 #include "kernel.hh"
 #include "spinlock.hh"

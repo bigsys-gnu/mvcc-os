@@ -1,5 +1,3 @@
-#define __KERNEL__
-
 #include "mvrlu/port-kernel.h"
 #include "mvrlu/bind_c.h"
 
