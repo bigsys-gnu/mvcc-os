@@ -14,18 +14,14 @@ extern "C" {
 #include <pthread.h>
 #include <time.h>
 #include <errno.h>
+#endif
+
 #ifndef likely
 #define likely(x) __builtin_expect((unsigned long)(x), 1)
 #endif
 #ifndef unlikely
 #define unlikely(x) __builtin_expect((unsigned long)(x), 0)
 #endif
-#else /* __KERNEL__ */
-#include <linux/printk.h>
-#include <linux/string.h>
-#include <linux/slab.h>
-#include <linux/bug.h>
-#endif /* __KERNEL__ */
 
 #ifndef __read_mostly
 #define __read_mostly __attribute__((__section__(".data..read_mostly")))
