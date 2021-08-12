@@ -1206,7 +1206,6 @@ int mvrlu_init(void)
 
 	return 0;
 }
-early_initcall(mvrlu_init);
 
 void mvrlu_finish(void)
 {
@@ -1220,7 +1219,6 @@ mvrlu_thread_struct_t *mvrlu_thread_alloc(void)
 {
 	return port_alloc(sizeof(mvrlu_thread_struct_t));
 }
-EXPORT_SYMBOL(mvrlu_thread_alloc);
 
 void mvrlu_thread_free(mvrlu_thread_struct_t *self)
 {
@@ -1235,7 +1233,6 @@ void mvrlu_thread_free(mvrlu_thread_struct_t *self)
 	if (self->log.head_cnt == self->log.tail_cnt)
 		port_free(self);
 }
-EXPORT_SYMBOL(mvrlu_thread_free);
 
 void mvrlu_thread_init(mvrlu_thread_struct_t *self)
 {
@@ -1251,7 +1248,6 @@ void mvrlu_thread_init(mvrlu_thread_struct_t *self)
 	thread_list_add(&g_live_threads, self);
 	smp_mb();
 }
-EXPORT_SYMBOL(mvrlu_thread_init);
 
 void mvrlu_thread_finish(mvrlu_thread_struct_t *self)
 {
@@ -1275,7 +1271,6 @@ void mvrlu_thread_finish(mvrlu_thread_struct_t *self)
 		thread_list_add(&g_zombie_threads, self);
 	}
 }
-EXPORT_SYMBOL(mvrlu_thread_finish);
 
 void *mvrlu_alloc_x(size_t size, unsigned int flags)
 {
@@ -1290,13 +1285,11 @@ void *mvrlu_alloc_x(size_t size, unsigned int flags)
 	ahs->obj_hdr.obj_size = size;
 	return ahs->obj_hdr.obj;
 }
-EXPORT_SYMBOL(mvrlu_alloc_x);
 
 void *mvrlu_alloc(size_t size)
 {
 	return mvrlu_alloc_x(size, 0);
 }
-EXPORT_SYMBOL(mvrlu_alloc);
 
 void mvrlu_free(mvrlu_thread_struct_t *self, void *obj)
 {
@@ -1317,7 +1310,6 @@ void mvrlu_free(mvrlu_thread_struct_t *self, void *obj)
 	self->free_ptrs.ptrs[self->free_ptrs.num_ptrs++] = p_act;
 	mvrlu_assert(self->free_ptrs.num_ptrs < MVRLU_MAX_FREE_PTRS);
 }
-EXPORT_SYMBOL(mvrlu_free);
 
 void mvrlu_reader_lock(mvrlu_thread_struct_t *self)
 {
@@ -1346,7 +1338,6 @@ void mvrlu_reader_lock(mvrlu_thread_struct_t *self)
 	mvrlu_assert(self->log.cur_wrt_set == NULL);
 	mvrlu_assert(self->free_ptrs.num_ptrs == 0);
 }
-EXPORT_SYMBOL(mvrlu_reader_lock);
 
 void mvrlu_reader_unlock(mvrlu_thread_struct_t *self)
 {
@@ -1381,7 +1372,6 @@ void mvrlu_reader_unlock(mvrlu_thread_struct_t *self)
 	mvrlu_assert(self->log.cur_wrt_set == NULL);
 	mvrlu_assert(self->free_ptrs.num_ptrs == 0);
 }
-EXPORT_SYMBOL(mvrlu_reader_unlock);
 
 void mvrlu_abort(mvrlu_thread_struct_t *self)
 {
@@ -1405,7 +1395,6 @@ void mvrlu_abort(mvrlu_thread_struct_t *self)
 	mvrlu_assert(self->log.cur_wrt_set == NULL);
 	mvrlu_assert(self->free_ptrs.num_ptrs == 0);
 }
-EXPORT_SYMBOL(mvrlu_abort);
 
 void *mvrlu_deref(mvrlu_thread_struct_t *self, void *obj)
 {
@@ -1439,7 +1428,6 @@ void *mvrlu_deref(mvrlu_thread_struct_t *self, void *obj)
 	}
 	return (void *)p_act;
 }
-EXPORT_SYMBOL(mvrlu_deref);
 
 int _mvrlu_try_lock(mvrlu_thread_struct_t *self, void **pp_obj, size_t size)
 {
@@ -1518,7 +1506,6 @@ int _mvrlu_try_lock(mvrlu_thread_struct_t *self, void **pp_obj, size_t size)
 	mvrlu_assert(ahs->act_hdr.p_lock);
 	return 1;
 }
-EXPORT_SYMBOL(_mvrlu_try_lock);
 
 int _mvrlu_try_lock_const(mvrlu_thread_struct_t *self, void *obj, size_t size)
 {
@@ -1528,7 +1515,6 @@ int _mvrlu_try_lock_const(mvrlu_thread_struct_t *self, void *obj, size_t size)
 	 * NOTE: obj is not updated after the call (not void ** but void *) */
 	return _mvrlu_try_lock(self, &obj, 0);
 }
-EXPORT_SYMBOL(_mvrlu_try_lock_const);
 
 int mvrlu_cmp_ptrs(void *obj1, void *obj2)
 {
@@ -1538,7 +1524,6 @@ int mvrlu_cmp_ptrs(void *obj1, void *obj2)
 		obj2 = get_act_obj(obj2);
 	return obj1 == obj2;
 }
-EXPORT_SYMBOL(mvrlu_cmp_ptrs);
 
 void _mvrlu_assign_pointer(void **p_ptr, void *obj)
 {
@@ -1546,7 +1531,6 @@ void _mvrlu_assign_pointer(void **p_ptr, void *obj)
 		obj = get_act_obj(obj);
 	*p_ptr = obj;
 }
-EXPORT_SYMBOL(_mvrlu_assign_pointer);
 
 void mvrlu_flush_log(mvrlu_thread_struct_t *self)
 {
@@ -1557,7 +1541,6 @@ void mvrlu_flush_log(mvrlu_thread_struct_t *self)
 	stat_reset(&(self)->stat);
 #endif
 }
-EXPORT_SYMBOL(mvrlu_flush_log);
 
 void mvrlu_print_stats(void)
 {
@@ -1616,4 +1599,3 @@ static void print_config(void)
 	       "IT MAY AFFECT BENCHMARK RESULTS!\n" );
 #endif
 }
-EXPORT_SYMBOL(mvrlu_print_stats);
