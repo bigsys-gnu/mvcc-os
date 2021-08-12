@@ -1,4 +1,6 @@
-MVRLU_C = bind_c mvrlu
+# -*- makefile-gmake -*-
+
+MVRLU_C = mvrlu
 
 MVRLU_CPP = port-kernel
 MVRLU_OBJS = $(addsuffix .o, ${MVRLU_C} ${MVRLU_CPP})

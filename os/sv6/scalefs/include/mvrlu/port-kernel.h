@@ -3,6 +3,10 @@
 
 #include "port_data.h"
 
+/* #ifdef __cplusplus */
+/* extern "C" { */
+/* #endif */
+
 typedef unsigned long size_t;
 
 /*
@@ -55,5 +59,9 @@ void port_initiate_wakeup(struct mutex *mutex,
 
 void port_initiate_nap(struct mutex *mutex, struct completion *cond,
                               unsigned long usecs);
+
+/* #ifdef __cplusplus */
+/* } */
+/* #endif */
 
 #endif /* PORT-KERNEL_H */
