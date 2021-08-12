@@ -39,10 +39,6 @@
 #define mvrlu_stop_timer(tick)
 #endif /* MVRLU_TIME_MEASUREMENT */
 
-#define mvrlu_trace_global(fmt, ...)                                           \
-	fprintf(stderr, "\n%s:%d:%s(): " fmt, __FILE__, __LINE__, __func__,    \
-		##__VA_ARGS__);
-
 #define mvrlu_trace(self, fmt, ...)                                            \
 	fprintf(stderr, "\n[%d][%d][%ld]:%s:%d:%s(): " fmt, self->thread_id,   \
 		self->run_counter, self->local_version, __FILE__, __LINE__,    \

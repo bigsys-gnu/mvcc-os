@@ -1240,7 +1240,6 @@ static int init_qp_thread(mvrlu_qp_thread_t *qp_thread)
 				&qp_thread_main, qp_thread,
 				&qp_thread->completion);
 	if (rc) {
-		mvrlu_trace_global("Error creating builder thread: %d\n", rc);
 		return rc;
 	}
 	return 0;
@@ -1300,12 +1299,10 @@ int __init mvrlu_init(void)
 	init_thread_list(&g_zombie_threads);
 	rc = port_log_region_init(MVRLU_LOG_SIZE, MVRLU_MAX_THREAD_NUM);
 	if (rc) {
-		mvrlu_trace_global("Fail to initialize a log region\n");
 		return rc;
 	}
 	rc = init_qp_thread(&g_qp_thread);
 	if (rc) {
-		mvrlu_trace_global("Fail to initialize a qp thread\n");
 		return rc;
 	}
 

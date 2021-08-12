@@ -32,11 +32,9 @@ extern "C" {
  */
 #define ____ptr_aligned __attribute__((aligned(sizeof(void *))))
 
-#ifndef __KERNEL__
 #define PAGE_SIZE 4096
 #define L1_CACHE_BYTES 64
 #define ____cacheline_aligned __attribute__((aligned(L1_CACHE_BYTES)))
-#endif /* __KERNEL__ */
 
 #define CACHE_LINE_PREFETCH_UNIT (2)
 #define CACHE_DEFAULT_PADDING                                                  \
@@ -56,7 +54,6 @@ extern "C" {
 #define static_assert_msg(e, msg) static_assert(e)
 #endif
 
-#ifndef __KERNEL__
 static inline void __attribute__((__always_inline__)) smp_mb(void)
 {
 	__asm__ __volatile__("mfence" ::: "memory");
@@ -76,7 +73,6 @@ static inline void __attribute__((__always_inline__)) smp_wmb(void)
 /* { */
 /* 	__asm__ __volatile__("" ::: "memory"); */
 /* } */
-#endif
 
 static inline void __attribute__((__always_inline__)) smp_wmb_tso(void)
 {
@@ -118,21 +114,20 @@ static inline void __attribute__((__always_inline__)) smp_wmb_tso(void)
 
 #define cpu_relax() __asm__ volatile("pause\n" : : : "memory")
 
-static inline uint64_t __attribute__((__always_inline__)) read_tsc(void)
-{
-	uint32_t a, d;
-	__asm __volatile("rdtsc" : "=a"(a), "=d"(d));
-	return ((uint64_t)a) | (((uint64_t)d) << 32);
-}
+/* static inline uint64_t __attribute__((__always_inline__)) read_tsc(void) */
+/* { */
+/* 	uint32_t a, d; */
+/* 	__asm __volatile("rdtsc" : "=a"(a), "=d"(d)); */
+/* 	return ((uint64_t)a) | (((uint64_t)d) << 32); */
+/* } */
 
-static inline uint64_t __attribute__((__always_inline__)) read_tscp(void)
-{
-	uint32_t a, d;
-	__asm __volatile("rdtscp" : "=a"(a), "=d"(d));
-	return ((uint64_t)a) | (((uint64_t)d) << 32);
-}
+/* static inline uint64_t __attribute__((__always_inline__)) read_tscp(void) */
+/* { */
+/* 	uint32_t a, d; */
+/* 	__asm __volatile("rdtscp" : "=a"(a), "=d"(d)); */
+/* 	return ((uint64_t)a) | (((uint64_t)d) << 32); */
+/* } */
 
-#ifndef __KERNEL__
 static inline void cpuid(int i, unsigned int *a, unsigned int *b,
 			 unsigned int *c, unsigned int *d)
 {
@@ -141,16 +136,6 @@ static inline void cpuid(int i, unsigned int *a, unsigned int *b,
 			 : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
 			 : "a"(i), "c"(0));
 }
-#endif
-
-static inline unsigned int max_cpu_freq(void)
-{
-	/* https://bit.ly/2EbkRZp */
-	unsigned int regs[4];
-	cpuid(0x16, &regs[0], &regs[1], &regs[2], &regs[3]);
-	return regs[1];
-}
-
 
 #ifdef __cplusplus
 }

@@ -5,6 +5,7 @@
 #include "mvrlu/debug.h"
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
+#include "string.h"
 
 #define EBUSY 16
 
@@ -27,7 +28,6 @@ static mvrlu_qp_thread_t g_qp_thread ____cacheline_aligned2;
 static void qp_update_qp_clk_for_reclaim(mvrlu_qp_thread_t *qp_thread,
 					 mvrlu_thread_struct_t *thread);
 static int wakeup_qp_thread_for_reclaim(void);
-static void print_config(void);
 
 /*
  * Clock-related functions
@@ -1113,19 +1113,10 @@ static void __qp_thread_main(void *arg)
 	}
 }
 
-#ifdef __KERNEL__
-static int qp_thread_main(void *arg)
+static void qp_thread_main(void *arg)
 {
 	__qp_thread_main(arg);
-	return 0;
 }
-#else
-static void *qp_thread_main(void *arg)
-{
-	__qp_thread_main(arg);
-	return NULL;
-}
-#endif
 
 static int init_qp_thread(mvrlu_qp_thread_t *qp_thread)
 {
@@ -1138,7 +1129,6 @@ static int init_qp_thread(mvrlu_qp_thread_t *qp_thread)
 				&qp_thread_main, qp_thread,
 				&qp_thread->completion);
 	if (rc) {
-		mvrlu_trace_global("Error creating builder thread: %d\n", rc);
 		return rc;
 	}
 	return 0;
@@ -1197,12 +1187,10 @@ int mvrlu_init(void)
 	init_thread_list(&g_zombie_threads);
 	rc = port_log_region_init(MVRLU_LOG_SIZE, MVRLU_MAX_THREAD_NUM);
 	if (rc) {
-		mvrlu_trace_global("Fail to initialize a log region\n");
 		return rc;
 	}
 	rc = init_qp_thread(&g_qp_thread);
 	if (rc) {
-		mvrlu_trace_global("Fail to initialize a qp thread\n");
 		return rc;
 	}
 
@@ -1544,6 +1532,7 @@ void mvrlu_flush_log(mvrlu_thread_struct_t *self)
 #endif
 }
 
+#ifndef __KERNEL__
 void mvrlu_print_stats(void)
 {
 	printf("=================================================\n");
@@ -1560,44 +1549,4 @@ void mvrlu_print_stats(void)
 	printf("-------------------------------------------------\n");
 #endif
 }
-
-static void print_config(void)
-{
-	printf(
-#ifdef MVRLU_ORDO_TIMESTAMPING
-	       "  MVRLU_ORDO_TIMESTAMPING = 1\n"
-#else
-	       "  MVRLU_ORDO_TIMESTAMPING = 0\n"
 #endif
-	       );
-	printf( "  MVRLU_LOG_SIZE = %ld\n" ,
-	       MVRLU_LOG_SIZE);
-	printf(
-	       "  MVRLU_LOG_LOW_MARK = %ld\n" ,
-	       MVRLU_LOG_LOW_MARK);
-	printf(
-	       "  MVRLU_LOG_HIGH_MARK = %ld\n" ,
-	       MVRLU_LOG_HIGH_MARK);
-#ifdef MVRLU_ENABLE_ASSERT
-	printf(MVRLU_COLOR_RED "  MVRLU_ENABLE_ASSERT is on.          "
-			       "DO NOT USE FOR BENCHMARK!\n" );
-#endif
-#ifdef MVRLU_ENABLE_FREE_POISIONING
-	printf(MVRLU_COLOR_RED "  MVRLU_ENABLE_FREE_POISIONING is on. "
-			       "DO NOT USE FOR BENCHMARK!\n" );
-#endif
-#ifdef MVRLU_ENABLE_STATS
-	printf(MVRLU_COLOR_RED "  MVRLU_ENABLE_STATS is on.       "
-			       "DO NOT USE FOR BENCHMARK!\n" );
-#endif
-#ifdef MVRLU_TIME_MEASUREMENT
-	printf(MVRLU_COLOR_RED "  MVRLU_TIME_MEASUREMENT is on.       "
-			       "DO NOT USE FOR BENCHMARK!\n" );
-#endif
-#if defined(MVRLU_ENABLE_TRACE_0) || defined(MVRLU_ENABLE_TRACE_1) ||          \
-	defined(MVRLU_ENABLE_TRACE_2) || defined(MVRLU_ENABLE_TRACE_3)
-	printf(MVRLU_COLOR_MAGENTA
-	       "  MVRLU_ENABLE_TRACE_*  is on.        "
-	       "IT MAY AFFECT BENCHMARK RESULTS!\n" );
-#endif
-}

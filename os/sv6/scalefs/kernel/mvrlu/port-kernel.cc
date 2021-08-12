@@ -11,10 +11,6 @@ extern "C" {
 #include "mvrlu/bind_c.h"
 }
 
-void test_mvrlu(void) {
-  cprintf("mvrlu makefile\n");
-}
-
 /*
  * Log region
  */
