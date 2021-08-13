@@ -153,14 +153,13 @@ int list_delete(int key, list_t *list)
 
 int list_find(int key, list_t *list)
 {
-    node_t *prev = NULL, *cur = NULL;
-    int ret = 0, val;
+    node_t *node = list->head;
+    int ret = 0, val = 0;
 
     list->lk.acquire();
-
-    for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
+    for (; node != NULL; node = node->next)
     {
-        if ((val = cur->value) == key)
+        if ((val = node->value) == key)
         {
             ret = (val == key);
             break;
@@ -187,7 +186,6 @@ void test(void* param)
         value = randomrange(1, p_data->range);
         bucket = HASH_VALUE(p_hash_list, value);
         list_t *p_list = p_hash_list->buckets[bucket];
-        // p_list = p_list;
         if (op < p_data->update)
         {
             if ((op & 0x01) == 0)
@@ -323,15 +321,12 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
             cprintf( "elapsed time: %dms\n", (int)((nsectime() / 1000000) - initial_time));
             break;
         }
-        // cprintf( "elapsed time: %dms\n", (int)(nsectime() / 1000000));
     }
 
     cprintf("join %d threads...\n", nb_threads);
     for(int i = 0; i < nb_threads; i++)
     {
         wait(-1, NULL);
-        // thread_join();
-        // sleep(0);
     }
     cprintf(" done!\n");
 
@@ -346,17 +341,26 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 		updates += (param_list[i].result_add + param_list[i].result_remove);
 		total_variation += param_list[i].variation;
 	}
-    total_size = 0;
+
     for(int i = 0; i < n_buckets; i++)
     {
-
         node_t *node = p_hash_list->buckets[i]->head;
+        node_t *prev;
         while(node != NULL)
         {
+            prev = node;
             node = node->next;
+            kmfree((void*)prev, sizeof(node_t));
             total_size++;
         }
+
+        list_t *list = p_hash_list->buckets[i];
+        kmfree((void*)list, sizeof(list_t));
     }
+    kmfree((void*)p_hash_list, sizeof(hash_list_t));
+    kmfree((void*)thread_list, nb_threads*sizeof(struct proc*));
+    kmfree((void*)param_list, nb_threads*sizeof(thread_param_t));
+
     exp = initial + total_variation;
     cprintf( "\n#### B ####\n");
 
