@@ -135,3 +135,31 @@ public:
   
   NEW_DELETE_OPS(list<spinlock>);
 };
+
+template <>
+class hash_list<spinlock> {
+  int n_buckets_;
+  list<spinlock> **buckets_;
+public:
+  hash_list(int n_buckets): n_buckets_(n_buckets)
+  {
+
+    buckets_ = new list<spinlock> *[n_buckets];
+    for (int i = 0; i < n_buckets; i++)
+      buckets_[i] = new list<spinlock>();
+  }
+  ~hash_list(void) {
+    for (int i = 0; i < n_buckets_; i++)
+      {
+        delete buckets_[i];
+      }
+    delete[] buckets_;
+  }
+
+  list<spinlock> *
+  get_list(int key) {
+    return buckets_[key];
+  }
+
+  NEW_DELETE_OPS(hash_list<spinlock>);
+};
