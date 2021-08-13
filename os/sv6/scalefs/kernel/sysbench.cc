@@ -77,6 +77,7 @@ class list {
   int list_insert(T& data, int key) { return 0; }
   int list_delete(T& data, int key) { return 0; }
   int list_find(T& data, int key) { return 0; }
+  int get_total_node_number(void) { return 0; }
 };
 
 template <typename T>
@@ -87,7 +88,9 @@ class hash_list {
 
 template <typename T>
 struct thread_data {};
-
+//////////////////////////////////////
+// SPINLOCK
+/////////////////////////////////////
 template <typename T>
 struct thread_param {
   int n_buckets;
@@ -216,7 +219,16 @@ public:
       }
     return ret;
   }
-  
+
+  int get_total_node_number(void) {
+    int total_num = 0;
+    for (auto iter = head_->next; iter != NULL; iter = iter->next)
+    {
+      total_num++;
+    }
+    return total_num;
+  }
+
   NEW_DELETE_OPS(list<spinlock>);
 };
 
@@ -293,11 +305,14 @@ void test<spinlock>(void *param) {
     }
   cprintf("thread %d end\n", myproc()->pid);
 }
+//////////////////////////////////////
+// SPINLOCK
+/////////////////////////////////////
 
 void sleep_usec(u64 initial_time, u64 usec);
 
 template <typename T>
-void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], size_t len);
+void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration);
 
 //SYSCALL
 void
@@ -366,7 +381,7 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
 
       cprintf(" done!\n");
 
-      print_outcome<spinlock>(*hl, param_list, nb_threads);
+      print_outcome<spinlock>(*hl, param_list, nb_threads, initial, duration);
 
       // deallocate memory
       delete hl;
@@ -377,9 +392,11 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
       delete[] thread_list;
       delete[] param_list;
     } // spinlock
-  
+  cprintf("Kernel Level Benchmark END\n");
 }
-
+//////////////////////////////////////
+// NO DEPENDENT CODE
+/////////////////////////////////////
 // initial_time is nano sec
 void sleep_usec(u64 initial_time, u64 usec) {
   spinlock l("l");
@@ -392,10 +409,10 @@ void sleep_usec(u64 initial_time, u64 usec) {
 }
 
 template <typename T>
-void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], size_t len) {
-  int reads, updates, total_variation;
+void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration) {
+  int reads = 0, updates = 0, total_variation = 0;
 
-  for (int i = 0; i < len; i++)
+  for (int i = 0; i < nb_threads; i++)
     {
       cprintf( "Thread %d\n", i);
       cprintf( "  #add        : %d\n", param_list[i]->result_add);
@@ -406,4 +423,24 @@ void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], size_t len) 
       updates += (param_list[i]->result_add + param_list[i]->result_remove);
       total_variation += param_list[i]->variation;
     }
+  unsigned long total_size = 0;
+  for (int i = 0; i < param_list[0]->n_buckets; i++)
+    total_size += hl.get_list(i)->get_total_node_number();
+
+  unsigned long exp = initial + total_variation;
+  cprintf( "\n#### B ####\n");
+
+  cprintf( "Set size      : %lu (expected: %lu)\n", total_size, exp);
+  cprintf( "Duration      : %d (ms)\n", duration);
+  unsigned long iv = reads * 1000.0 / duration;
+  unsigned long fv = (unsigned long)(reads * 1000.0 / duration * 10) % 10;
+  cprintf( "#read ops     : %d (%lu.%lu / s)\n", reads, iv, fv);
+  iv = updates * 1000.0 / duration;
+  fv = (unsigned long)(updates * 1000.0 / duration * 10) % 10;
+  cprintf( "#update ops   : %d (%lu.%lu / s)\n", updates, iv, fv);
+
+  if(exp != total_size)
+  {
+    cprintf("\n<<<<<< ASSERT FAILURE(%lu!=%lu) <<<<<<<<\n", exp, total_size);
+  }
 }
