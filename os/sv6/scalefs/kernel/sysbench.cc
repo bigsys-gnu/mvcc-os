@@ -32,13 +32,50 @@ class list {
   int list_find(T& data, int key) { return 0; }
 };
 
+template <typename T>
+class hash_list {
+  int n_buckets_;
+  list<T> **buckets_;
+};
+
+template <typename T>
+struct thread_data {};
+
+template <typename T>
+struct thread_param {
+  int n_buckets;
+  int initial;
+  int nb_threads;
+  int update;
+  int range;
+  int variation;
+  int result_add;
+  int result_remove;
+  int result_contains;
+  int result_found;
+  int &stop;
+  hash_list<T> &hash_list;
+  thread_data<T> &data;
+
+  thread_param(int n_buckets, int initial, int nb_threads, int update, int range,
+               int &stop, hash_list<T> &hash_list, thread_data<T> &data)
+    :n_buckets(n_buckets), initial(initial), nb_threads(nb_threads), update(update),
+     range(range), stop(stop), hash_list(hash_list), data(data), variation(0),
+     result_add(0), result_remove(0), result_contains(0), result_found(0) {}
+
+  NEW_DELETE_OPS(thread_param<T>);
+};
+
+template <typename T>
+void test(void *param) {}
+
 template <>
 class list<spinlock> {
   node *head_;
   spinlock lk_;
 public:
-  list<spinlock>(void) : head_(new node(0)), lk_("spin bench") {}
-  ~list<spinlock>(void) {
+  list(void) : head_(new node(0)), lk_("spin bench") {}
+  ~list(void) {
     for (auto iter = head_; iter != NULL;)
     {
       auto trash = iter;
