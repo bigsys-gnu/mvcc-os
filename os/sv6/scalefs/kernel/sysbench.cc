@@ -16,6 +16,7 @@
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
+#define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
 //////////////////////////////////////
 // RANDOM FUNCTIONS
 /////////////////////////////////////
@@ -82,7 +83,6 @@ struct thread_data {};
 template <typename T>
 struct thread_param {
   int n_buckets;
-  int id;
   int nb_threads;
   int update;
   int range;
@@ -96,9 +96,9 @@ struct thread_param {
   hash_list<T> &hash_list;
   thread_data<T> &data;
 
-  thread_param(int n_buckets, int id, int nb_threads, int update, int range,
+  thread_param(int n_buckets, int nb_threads, int update, int range,
                int &stop, hash_list<T> &hash_list, thread_data<T> &data)
-    :n_buckets(n_buckets), id(id), nb_threads(nb_threads), update(update),
+    :n_buckets(n_buckets), nb_threads(nb_threads), update(update),
      range(range), stop(stop), hash_list(hash_list), data(data), variation(0),
      result_add(0), result_remove(0), result_contains(0), result_found(0) {
     rand_init(seed);
@@ -242,3 +242,48 @@ public:
   NEW_DELETE_OPS(hash_list<spinlock>);
 };
 
+template <>
+void test<spinlock>(void *param) {
+  int op, bucket, value;
+  auto *p_data = reinterpret_cast<thread_param<spinlock> *>(param);
+  auto &hash_list = p_data->hash_list;
+
+  cprintf("thread %d Start\n", myproc()->pid);
+  // need condition for barrier
+  while (p_data->stop == 0)
+    {
+      op = rand_range(1000, p_data->seed);
+      value = rand_range(p_data->range, p_data->seed);
+      bucket = HASH_VALUE(hash_list, value);
+      auto *p_list = hash_list.get_list(bucket);
+
+      if (op < p_data->update)
+        {
+          if ((op & 0x01) == 0)
+            {
+              if (p_list->list_insert(value))
+                {
+                  p_data->variation++;
+                }
+              p_data->result_add++;
+            }
+          else
+            {
+              if (p_list->list_delete(value))
+                {
+                  p_data->variation--;
+                }
+              p_data->result_remove++;
+            }
+        }
+      else
+        {
+          if(p_list->list_find(value) >= 0)
+            {
+              p_data->result_contains++;
+            }
+          p_data->result_found++;
+        }
+    }
+  cprintf("thread %d end\n", myproc()->pid);
+}
