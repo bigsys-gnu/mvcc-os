@@ -16,6 +16,44 @@
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
+//////////////////////////////////////
+// RANDOM FUNCTIONS
+/////////////////////////////////////
+uint64_t
+u_rand(void)
+{
+  uint64_t t = rdtsc() / 2;
+  return (t >= 0) ? t : 0 - t;
+}
+
+static inline int MarsagliaXORV (int x) { 
+  if (x == 0) x = 1 ; 
+  x ^= x << 6;
+  x ^= ((unsigned)x) >> 21;
+  x ^= x << 7 ; 
+  return x ;        // use either x or x & 0x7FFFFFFF
+}
+
+static inline int MarsagliaXOR (int * seed) {
+  int x = MarsagliaXORV(*seed);
+  *seed = x ; 
+  return x & 0x7FFFFFFF;
+}
+
+static inline void rand_init(unsigned short *seed)
+{
+  seed[0] = (unsigned short)u_rand();
+  seed[1] = (unsigned short)u_rand();
+  seed[2] = (unsigned short)u_rand();
+}
+
+static inline int rand_range(int n, unsigned short *seed)
+{
+  int v = MarsagliaXOR((int *)seed) % n;
+  return v;
+}
+////////////////////////////////////////////////////////
+
 struct node {
   node *next;
   int value;
@@ -44,7 +82,7 @@ struct thread_data {};
 template <typename T>
 struct thread_param {
   int n_buckets;
-  int initial;
+  int id;
   int nb_threads;
   int update;
   int range;
@@ -54,14 +92,17 @@ struct thread_param {
   int result_contains;
   int result_found;
   int &stop;
+  unsigned short seed[3];
   hash_list<T> &hash_list;
   thread_data<T> &data;
 
-  thread_param(int n_buckets, int initial, int nb_threads, int update, int range,
+  thread_param(int n_buckets, int id, int nb_threads, int update, int range,
                int &stop, hash_list<T> &hash_list, thread_data<T> &data)
-    :n_buckets(n_buckets), initial(initial), nb_threads(nb_threads), update(update),
+    :n_buckets(n_buckets), id(id), nb_threads(nb_threads), update(update),
      range(range), stop(stop), hash_list(hash_list), data(data), variation(0),
-     result_add(0), result_remove(0), result_contains(0), result_found(0) {}
+     result_add(0), result_remove(0), result_contains(0), result_found(0) {
+    rand_init(seed);
+  }
 
   NEW_DELETE_OPS(thread_param<T>);
 };
@@ -200,3 +241,4 @@ public:
 
   NEW_DELETE_OPS(hash_list<spinlock>);
 };
+
