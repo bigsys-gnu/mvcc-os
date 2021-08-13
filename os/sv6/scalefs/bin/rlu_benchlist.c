@@ -7,7 +7,7 @@
 #include <sys/time.h>
 #include <time.h>
 
-#define MAX_BUCKETS (128)
+#define MAX_BUCKETS (2048)
 #define DEFAULT_BUCKETS                 1
 #define DEFAULT_DURATION                1000
 #define DEFAULT_UPDATE                  200
@@ -265,9 +265,9 @@ void *test(void* param)
         {
           if(list_find(self, value, p_list) >= 0)
             {
-              p_data->result_contains++;
+              p_data->result_found++;
             }
-          p_data->result_found++;
+          p_data->result_contains++;
         }
     }
 

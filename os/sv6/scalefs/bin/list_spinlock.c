@@ -1,7 +1,7 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <pthread.h>
 #include <unistd.h>
-#include "pthread.h"
 
 #define assert(COND)\
   if (!(COND)) {\
@@ -9,12 +9,7 @@
   exit(1);\
   }
 
-#undef NULL
-#define NULL ((void*)0)
-
-#define PGSIZE (4096)
-
-#define MAX_BUCKETS (128)
+#define MAX_BUCKETS (2048)
 #define DEFAULT_BUCKETS                 1
 #define DEFAULT_DURATION                1000
 #define DEFAULT_UPDATE                  200
@@ -54,6 +49,12 @@ typedef struct thread_param {
 } thread_param_t;
 
 static pthread_barrier_t bar;
+int n_buckets = DEFAULT_BUCKETS;
+int initial = DEFAULT_INITIAL;
+int nb_threads = DEFAULT_NB_THREADS;
+int duration = DEFAULT_DURATION;
+int update = DEFAULT_UPDATE;
+int range = DEFAULT_RANGE;
 
 int
 raw_list_insert(int key, list_t *list)
@@ -63,28 +64,28 @@ raw_list_insert(int key, list_t *list)
 
   for (prev = list->head, cur = prev->next; cur != NULL;
        prev = cur, cur = cur->next)
-    {
-      if (key < cur->value)
-        {
-          ret = 1;
-          new_node = (node_t *)malloc(sizeof(node_t));
-          new_node->value = key;
-          new_node->next = cur;
-          prev->next = new_node;
-          return ret;
-        }
-      else if (key == cur->value)
-        return ret;             /* already exists */
-    }
-
-  if (cur == NULL)
+  {
+    if (key < cur->value)
     {
       ret = 1;
       new_node = (node_t *)malloc(sizeof(node_t));
       new_node->value = key;
       new_node->next = cur;
       prev->next = new_node;
+      return ret;
     }
+    else if (key == cur->value)
+      return ret;             /* already exists */
+  }
+
+  if (cur == NULL)
+  {
+    ret = 1;
+    new_node = (node_t *)malloc(sizeof(node_t));
+    new_node->value = key;
+    new_node->next = cur;
+    prev->next = new_node;
+  }
   return ret;
 }
 
@@ -96,25 +97,25 @@ int list_insert(int key, list_t *list)
   pthread_mutex_lock(&list->l);
 
   for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
+  {
+    if (cur->value > key)
     {
-      if (cur->value == key)
-        {
-          pthread_mutex_unlock(&list->l);
-          return ret;             /* the key value already exists. */
-        }
-      else if (cur->value > key)
-        {
-          /* initialize node */
-          new_node = (node_t *) malloc(sizeof(node_t));
-          new_node->value = key;
+      /* initialize node */
+      new_node = (node_t *) malloc(sizeof(node_t));
+      new_node->value = key;
 
-          /* insert node */
-          new_node->next = prev->next;
-          prev->next = new_node;
-          ret = 1;
-		  break;
-        }
+      /* insert node */
+      new_node->next = prev->next;
+      prev->next = new_node;
+      ret = 1;
+      break;
     }
+    else if (cur->value == key)
+    {
+      pthread_mutex_unlock(&list->l);
+      return ret;             /* the key value already exists. */
+    }    
+  }
 
   if (ret == 0 && cur == NULL)      /* cur is NULL now */
     {
@@ -138,19 +139,18 @@ int list_delete(int key, list_t *list)
   int ret = 0;
 
   pthread_mutex_lock(&list->l);
-  for (prev = list->head, cur = prev->next; cur != NULL;
-       prev = cur, cur = cur->next)
+  for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
+  {
+    /* found the target to be trashed. */
+    if (cur->value == key)
     {
-      /* found the target to be trashed. */
-      if (cur->value == key)
-        {
-		  cur_n = cur->next;
+      cur_n = cur->next;
 
-          prev->next = cur_n;
-          ret = 1;
-          break;
-        }
+      prev->next = cur_n;
+      ret = 1;
+      break;
     }
+  }
   pthread_mutex_unlock(&list->l);
   free(cur);
 
@@ -168,13 +168,13 @@ int list_find(int key, list_t *list)
 
   while(cur != NULL)
   {
-	/* found the value. */
-	if (cur->value == key)
+    /* found the value. */
+    if (cur->value == key)
 	  {
-		value = cur->value;
-		break;
+      value = cur->value;
+      break;
 	  }
-	cur = cur->next;
+	  cur = cur->next;
   }
 
   pthread_mutex_unlock(&list->l);
@@ -192,40 +192,40 @@ void *test(void* param)
   pthread_barrier_wait(&bar);
 
   while (*p_data->stop == 0)
-    {
-      op = rand() % 1000;
-      value = rand() % (p_data->range);
-      bucket = HASH_VALUE(p_hash_list, value);
-      list_t *p_list = p_hash_list->buckets[bucket];
+  {
+    op = rand() % 1000;
+    value = rand() % (p_data->range);
+    bucket = HASH_VALUE(p_hash_list, value);
+    list_t *p_list = p_hash_list->buckets[bucket];
 
-      if (op < p_data->update)
+    if (op < p_data->update)
+    {
+      if ((op & 0x01) == 0)
+      {
+        if (list_insert(value, p_list))
         {
-          if ((op & 0x01) == 0)
-            {
-              if (list_insert(value, p_list))
-                {
-                  p_data->variation++;
-                }
-              p_data->result_add++;
-            }
-          else
-            {
-              if (list_delete(value, p_list))
-                {
-                  p_data->variation--;
-                }
-              p_data->result_remove++;
-            }
+          p_data->variation++;
         }
+        p_data->result_add++;
+      }
       else
+      {
+        if (list_delete(value, p_list))
         {
-          if(list_find(value, p_list) >= 0)
-            {
-              p_data->result_contains++;
-            }
-          p_data->result_found++;
+          p_data->variation--;
         }
+        p_data->result_remove++;
+      }
     }
+    else
+    {
+      if(list_find(value, p_list) >= 0)
+      {
+        p_data->result_found++;
+      }
+      p_data->result_contains++;
+    }
+  }
 
   printf("thread %d end\n", p_data->id);
   return NULL;
@@ -241,32 +241,26 @@ int main(int argc, char **argv)
   unsigned long reads = 0, updates = 0;
   unsigned long iv = 0, fv = 0;
 
-  int n_buckets = DEFAULT_BUCKETS;
-  int initial = DEFAULT_INITIAL;
-  int nb_threads = DEFAULT_NB_THREADS;
-  int duration = DEFAULT_DURATION;
-  int update = DEFAULT_UPDATE;
-  int range = DEFAULT_RANGE;
   int i;
 
   switch (argc - 1)
-    {
-    case 6:
-      range = atoi(argv[6]);
-    case 5:
-      update = atoi(argv[5]);
-    case 4:
-      duration = atoi(argv[4]);
-    case 3:
-      n_buckets = atoi(argv[3]);
-    case 2:
-      initial = atoi(argv[2]);
-    case 1:
-      nb_threads = atoi(argv[1]);
-    default:
-      printf("%d Option is inserted\n", argc - 1);
-      break;
-    }
+  {
+  case 6:
+    range = atoi(argv[6]);
+  case 5:
+    update = atoi(argv[5]);
+  case 4:
+    duration = atoi(argv[4]);
+  case 3:
+    n_buckets = atoi(argv[3]);
+  case 2:
+    initial = atoi(argv[2]);
+  case 1:
+    nb_threads = atoi(argv[1]);
+  default:
+    printf("%d Option is inserted\n", argc - 1);
+    break;
+  }
   printf( "-Nb threads   : %d\n", nb_threads);
   printf( "-Initial size : %d\n", initial);
   printf( "-Buckets      : %d\n", n_buckets);
@@ -352,9 +346,10 @@ int main(int argc, char **argv)
 
   printf("join %d threads...\n", nb_threads);
   for(i = 0; i < nb_threads; i++)
-    {
-      pthread_join(thread_list[i], 0);
-    }
+  {
+    pthread_join(thread_list[i], 0);
+  }
+
   printf(" done!\n");
 
   printf("\n####result####\n");
@@ -364,21 +359,21 @@ int main(int argc, char **argv)
     printf("  #remove     : %d\n", param_list[i].result_remove);
     printf("  #contains   : %d\n", param_list[i].result_contains);
     printf("  #found      : %d\n", param_list[i].result_found);
-    reads += param_list[i].result_contains;
+    reads += param_list[i].result_found;
     updates += (param_list[i].result_add + param_list[i].result_remove);
     total_variation += param_list[i].variation;
   }
 
   total_size = 0;
   for(i = 0; i < n_buckets; i++)
+  {
+    node_t *node = p_hash_list->buckets[i]->head->next;
+    while(node != NULL)
     {
-      node_t *node = p_hash_list->buckets[i]->head->next;
-      while(node != NULL)
-        {
-          node = node->next;
-          total_size++;
-        }
+      node = node->next;
+      total_size++;
     }
+  }
   exp = initial + total_variation;
 
   printf("Set size      : %lu (expected: %lu)\n", total_size, exp);
