@@ -107,9 +107,7 @@ public:
 
   NEW_DELETE_OPS(hash_list<T>);
 };
-//////////////////////////////////////
-// SPINLOCK
-/////////////////////////////////////
+
 template <typename T>
 struct thread_param {
   int n_buckets;
@@ -138,6 +136,15 @@ struct thread_param {
 template <typename T>
 void test(void *param) {}
 
+template <typename T>
+void bench_init(void) {}
+
+template <typename T>
+void bench_finish(void) {}
+
+//////////////////////////////////////
+// SPINLOCK START
+/////////////////////////////////////
 template <>
 class list<spinlock> {
   node *head_;
@@ -296,22 +303,37 @@ void test<spinlock>(void *param) {
   cprintf("thread %d end\n", myproc()->pid);
 }
 //////////////////////////////////////
-// SPINLOCK
+// SPINLOCK END
 /////////////////////////////////////
 //////////////////////////////////////
-// MVRLU
+// MVRLU START
 /////////////////////////////////////
 struct mvrlu_bench {};
 struct mvrlu_node {
   int value;
   mvrlu_node *next;
 
-  void *operator new(size_t size) {
+  mvrlu_node(int val): value(val), next(NULL) {}
+
+  static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
     return mvrlu::mvrlu_alloc<mvrlu_node>();
   }
-  void operator delete(void *ptr) {
-    mvrlu::mvrlu_free(ptr);
+
+  static void* operator new(unsigned long nbytes) {
+    void *p = mvrlu_node::operator new(nbytes, std::nothrow);
+    if (p == nullptr)
+      throw_bad_alloc();
+    return p;
   }
+
+  static void operator delete(void *p, const std::nothrow_t&) noexcept {
+    mvrlu::mvrlu_free(p);
+  }
+
+  static void operator delete(void *p) {
+    mvrlu_node::operator delete(p, std::nothrow);
+  }
+
 };
 // mvrlu::thread_handle<node> h;
 
@@ -319,7 +341,7 @@ template <>
 class list<mvrlu_bench> {
   mvrlu_node *head_;
 public:
-  list(void):head_(NULL) {}
+  list(void):head_(new mvrlu_node(0)) {}
   ~list(void) {
     for (auto iter = head_; iter != NULL; )
     {
@@ -328,14 +350,180 @@ public:
       delete trash;
     }
   }
+
+  int list_insert(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+    mvrlu_node *prev, *cur;
+    int ret = 0;
+
+  restart:
+    h.mvrlu_reader_lock();
+    for (prev = h.mvrlu_deref(head_), cur = h.mvrlu_deref(prev->next); ;
+         prev = cur, cur = h.mvrlu_deref(cur->next))
+    {
+      if (cur == NULL || cur->value > key)
+      {
+        if (!h.mvrlu_try_lock(&prev))
+        {
+          h.mvrlu_abort();
+          goto restart;
+        }
+        auto new_node = new mvrlu_node(key);
+        mvrlu::mvrlu_assign_pointer(&new_node->next, prev->next);
+        mvrlu::mvrlu_assign_pointer(&prev->next, new_node);
+        ret = 1;
+        break;
+      }
+      else if (cur->value == key)
+        break;
+    }
+    h.mvrlu_reader_unlock();
+    return ret;
+  }
+
+  int list_delete(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+    mvrlu_node *prev, *cur;
+    int ret = 0;
+
+  restart:
+    h.mvrlu_reader_lock();
+    for (prev = h.mvrlu_deref(head_), cur = h.mvrlu_deref(prev->next); cur != NULL;
+         prev = cur, cur = h.mvrlu_deref(cur->next))
+    {
+      if (cur->value == key)
+      {
+        if (!h.mvrlu_try_lock(&prev) ||
+            !h.mvrlu_try_lock_const(cur))
+        {
+          h.mvrlu_abort();
+          goto restart;
+        }
+        auto *cur_n = h.mvrlu_deref(cur->next);
+        mvrlu::mvrlu_assign_pointer(&prev->next, cur_n);
+        h.mvrlu_free(cur);
+        ret = 1;
+        break;
+      }
+    }
+    h.mvrlu_reader_unlock();
+    return ret;
+  }
+
+  int list_find(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+    int value = -1;
+
+    h.mvrlu_reader_lock();
+    auto *cur = h.mvrlu_deref(head_);
+
+    while (cur && cur->value < key)
+      cur = h.mvrlu_deref(cur->next);
+
+    if (cur && cur->value == key)
+      value = cur->value;
+
+    h.mvrlu_reader_unlock();
+    return value;
+  }
+
+  int raw_insert(int key) {
+    mvrlu_node *prev, *cur;
+    int ret = 0;
+
+    for (prev = head_, cur = prev->next; cur != NULL;
+         prev = cur, cur = cur->next)
+      {
+        if (key < cur->value)
+          {
+            ret = 1;
+            auto new_node = new mvrlu_node(key);
+            new_node->next = cur;
+            prev->next = new_node;
+            return ret;
+          }
+        else if(key == cur->value)
+          return ret;               // already exists
+      }
+
+    if (cur == NULL)
+      {
+        ret = 1;
+        auto new_node = new mvrlu_node(key);
+        new_node->next = cur;
+        prev->next = new_node;
+      }
+    return ret;
+  }
+
+  int get_total_node_number(void) {
+    int total_num = 0;
+    for (auto iter = head_->next; iter != NULL; iter = iter->next)
+      total_num++;
+    return total_num;
+  }
+
+  NEW_DELETE_OPS(list<mvrlu_bench>);
 };
 
 template <>
 void test<mvrlu_bench>(void *param) {
+  int op, bucket, value;
+  auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
+  auto &hash_list = *p_data->hl;
+  auto *handle = new mvrlu::thread_handle<mvrlu_node>();
 
+  cprintf("thread %d Start\n", myproc()->pid);
+  // need condition for barrier
+  while (p_data->stop == 0)
+    {
+      op = rand_range(1000, p_data->seed);
+      value = rand_range(p_data->range, p_data->seed);
+      bucket = value % p_data->n_buckets;
+      auto *p_list = hash_list.get_list(bucket);
+
+      if (op < p_data->update)
+        {
+          if ((op & 0x01) == 0)
+            {
+              if (p_list->list_insert(*handle, value))
+                {
+                  p_data->variation++;
+                }
+              p_data->result_add++;
+            }
+          else
+            {
+              if (p_list->list_delete(*handle, value))
+                {
+                  p_data->variation--;
+                }
+              p_data->result_remove++;
+            }
+        }
+      else
+        {
+          if(p_list->list_find(*handle, value) >= 0)
+            {
+              p_data->result_contains++;
+            }
+          p_data->result_found++;
+        }
+    }
+  delete handle;
+  cprintf("thread %d end\n", myproc()->pid);
+}
+
+template <>
+void bench_init<mvrlu_bench>(void)
+{
+  RLU_INIT();
+}
+
+template <>
+void bench_finish<mvrlu_bench>(void)
+{
+  RLU_FINISH();
 }
 //////////////////////////////////////
-// MVRLU
+// MVRLU END
 /////////////////////////////////////
 
 void sleep_usec(u64 initial_time, u64 usec);
@@ -346,6 +534,8 @@ void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threa
 template <typename T>
 void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range)
 {
+  bench_init<T>();
+
   hash_list<T> *hl = new hash_list<T>(n_buckets);
 
   cprintf("initialize %d nodes...", initial);
@@ -393,6 +583,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   for(int i = 0; i < nb_threads; i++)
     wait(-1, NULL);
 
+  bench_finish<T>();
   cprintf(" done!\n");
 
   print_outcome<T>(*hl, param_list, nb_threads, initial, duration);
@@ -412,7 +603,7 @@ void
 sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int update,
               int range)
 {
-  enum bench_type type = SPINLOCK;
+  enum bench_type type = MVRLU;
   cprintf("Run Kernel Level Benchmark\n");
 
   assert(n_buckets >= 1);
@@ -427,6 +618,7 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
     bench<spinlock>(nb_threads, initial, n_buckets, duration, update, range);
     break;
   default:
+    bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
     break;
   }
   cprintf("Kernel Level Benchmark END\n");

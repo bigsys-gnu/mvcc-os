@@ -2,6 +2,7 @@
 
 #include "mvrlu.h"
 #include "mvrlu_i.h"
+#include "cpputil.hh"
 #include <cstddef>
 
 namespace mvrlu {
@@ -86,6 +87,8 @@ namespace mvrlu {
     mvrlu_free(T *p_obj) {
       ::mvrlu_free(&self_, (void *)p_obj);
     }
+
+    NEW_DELETE_OPS(thread_handle<T>);
 
   private:
     mvrlu_thread_struct_t self_;
