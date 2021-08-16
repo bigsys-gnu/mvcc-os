@@ -107,9 +107,6 @@ public:
 
   NEW_DELETE_OPS(hash_list<T>);
 };
-
-template <typename T>
-struct thread_data {};
 //////////////////////////////////////
 // SPINLOCK
 /////////////////////////////////////
@@ -126,14 +123,13 @@ struct thread_param {
   int result_found;
   int &stop;
   unsigned short seed[3];
-  hash_list<T> &hl;
-  thread_data<T> &data;
+  hash_list<T> *hl;
 
   thread_param(int n_buckets, int nb_threads, int update, int range,
-               int &stop, hash_list<T> &hl, thread_data<T> &data)
+               int &stop, hash_list<T> *hl)
     :n_buckets(n_buckets), nb_threads(nb_threads), update(update),
      range(range), variation(0), result_add(0), result_remove(0),
-     result_contains(0), result_found(0), stop(stop), hl(hl), data(data) {
+     result_contains(0), result_found(0), stop(stop), hl(hl) {
     rand_init(seed);
   }
 
@@ -258,7 +254,7 @@ template <>
 void test<spinlock>(void *param) {
   int op, bucket, value;
   auto *p_data = reinterpret_cast<thread_param<spinlock> *>(param);
-  auto &hash_list = p_data->hl;
+  auto &hash_list = *p_data->hl;
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
@@ -351,11 +347,10 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
       cprintf("Main thread ID: %d\n", myproc()->pid);
       cprintf("Creating %d threads...", nb_threads);
       int stop = 0;             // shared by threads
-      thread_data<spinlock> d;  // spinlock need no data. this is just shell.
       for (int i = 0; i < nb_threads; i++)
         {
           param_list[i] = new thread_param<spinlock>(n_buckets, nb_threads, update,
-                                                     range, stop, *hl, d);
+                                                     range, stop, hl);
         }
       for (int i = 0; i < nb_threads; i++)
         {
