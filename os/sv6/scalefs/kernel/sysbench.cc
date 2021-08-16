@@ -16,8 +16,7 @@
 #include <uk/mman.h>
 #include <uk/utsname.h>
 #include <uk/unistd.h>
-
-#include "mvrlu/port-kernel.h"
+#include "mvrlu/mvrlu.hpp"
 
 #define MAX_BUCKETS (128)
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)

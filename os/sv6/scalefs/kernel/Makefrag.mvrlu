@@ -8,6 +8,3 @@ MVRLU_OBJS := $(addprefix mvrlu/, ${MVRLU_OBJS})
 MVRLU_OBJS := $(addprefix $(O)/kernel/, ${MVRLU_OBJS})
 
 OBJS += ${MVRLU_OBJS}
-
-${MVRLU_OBJS}: CFLAGS += -D__KERNEL__
-${MVRLU_OBJS}: CXXFLAGS += -D__KERNEL__

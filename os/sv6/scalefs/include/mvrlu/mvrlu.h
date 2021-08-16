@@ -50,12 +50,14 @@ void *mvrlu_deref(mvrlu_thread_struct_t *self, void *p_obj);
 
 void mvrlu_flush_log(mvrlu_thread_struct_t *self);
 
+#ifndef __cplusplus
 #define mvrlu_try_lock(self, p_p_obj)                                          \
 	_mvrlu_try_lock(self, (void **)p_p_obj, sizeof(**p_p_obj))
 #define mvrlu_try_lock_const(self, obj)                                        \
 	_mvrlu_try_lock_const(self, obj, sizeof(*obj))
 #define mvrlu_assign_ptr(self, p_ptr, p_obj)                                   \
 	_mvrlu_assign_pointer((void **)p_ptr, p_obj)
+#endif
 
 /*
  * MV-RLU API for kernel
