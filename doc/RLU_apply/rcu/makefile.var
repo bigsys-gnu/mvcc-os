@@ -1,0 +1,5 @@
+RCU_TARGET += rcu_in_helenOS_ch2
+RCU_TARGET += rcu_in_helenOS_ch3
+RCU_TARGET += scheduling
+RCU_TARGET += sleepable_rcu
+RCU_TARGET += xv6-book-ch1-code
