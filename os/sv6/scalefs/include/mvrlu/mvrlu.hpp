@@ -47,7 +47,19 @@ namespace mvrlu {
 
     // don't deallocate memory right away
     // _qp_thread will take care of.
-    void operator delete(void *, std::size_t) {}
+    static void operator delete(void *, std::size_t) {}
+
+    static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
+      assert(nbytes == sizeof(thread_handle<T>));
+      return kmalloc(sizeof(thread_handle<T>), "thread_handle");
+    }
+
+    static void* operator new(unsigned long nbytes) {
+      void *p = thread_handle<T>::operator new(nbytes, std::nothrow);
+      if (p == nullptr)
+        throw_bad_alloc();
+      return p;
+    }
 
     inline void
     mvrlu_reader_lock(void) {
@@ -87,8 +99,6 @@ namespace mvrlu {
     mvrlu_free(T *p_obj) {
       ::mvrlu_free(&self_, (void *)p_obj);
     }
-
-    NEW_DELETE_OPS(thread_handle<T>);
 
   private:
     mvrlu_thread_struct_t self_;

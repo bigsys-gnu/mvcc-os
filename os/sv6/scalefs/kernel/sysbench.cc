@@ -507,7 +507,7 @@ void test<mvrlu_bench>(void *param) {
           p_data->result_found++;
         }
     }
-  delete handle;
+  handle->~thread_handle<mvrlu_node>();
   cprintf("thread %d end\n", myproc()->pid);
 }
 
