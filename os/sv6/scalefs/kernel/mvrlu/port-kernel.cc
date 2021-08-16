@@ -7,6 +7,8 @@
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
 
+#define GET_MEM(PTR) \
+  ((struct alloc_mem *) ((char *) PTR - sizeof(unsigned long)))
 /*
  * Log region
  */
@@ -61,8 +63,7 @@ void *port_alloc_x(size_t size, unsigned int flags)
 
 void port_free(void *ptr)
 {
-  int *int_ptr = (int *)ptr;
-  struct alloc_mem *mem = (struct alloc_mem *)(int_ptr - sizeof(size_t));
+  struct alloc_mem *mem = GET_MEM(ptr);
   kmalignfree(mem, 4, mem->size);
 }
 
