@@ -304,6 +304,70 @@ void sleep_usec(u64 initial_time, u64 usec);
 template <typename T>
 void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration);
 
+template <typename T>
+void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range)
+{
+  hash_list<T> *hl = new hash_list<T>(n_buckets);
+
+  cprintf("initialize %d nodes...", initial);
+  int i = 0;
+  unsigned short seed[3];
+
+  rand_init(seed);
+  while (i < initial)
+  {
+    int value = rand_range(range, seed);
+    auto list = hl->get_list(value % n_buckets);
+
+    if (list->raw_insert(value))
+      i++;
+  }
+  cprintf("done\n");
+
+  // allocate pointer list
+  struct proc **thread_list = new struct proc *[nb_threads];
+  thread_param<T> **param_list = new thread_param<T> *[nb_threads];
+
+  // mile sec
+  u64 initial_time = nsectime();
+  cprintf("Main thread ID: %d\n", myproc()->pid);
+  cprintf("Creating %d threads...", nb_threads);
+  int stop = 0;             // shared by threads
+  for (int i = 0; i < nb_threads; i++)
+  {
+    param_list[i] = new thread_param<T>(n_buckets, nb_threads, update,
+                                               range, stop, hl);
+  }
+  for (int i = 0; i < nb_threads; i++)
+  {
+    thread_list[i] = threadpin(test<T>, (void*)param_list[i], "test_thread",
+                               i%(NCPU-1)+1);
+    cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(NCPU-1)+1,
+            thread_list[i]->get_state());
+  }
+  cprintf(" done!\n");
+
+  sleep_usec(initial_time, duration);
+
+  stop = 1;
+  cprintf("join %d threads...\n", nb_threads);
+  for(int i = 0; i < nb_threads; i++)
+    wait(-1, NULL);
+
+  cprintf(" done!\n");
+
+  print_outcome<T>(*hl, param_list, nb_threads, initial, duration);
+
+  // deallocate memory
+  delete hl;
+  for (int j = 0; j < nb_threads; j++)
+  {
+    delete param_list[j];
+  }
+  delete[] thread_list;
+  delete[] param_list;
+}
+
 //SYSCALL
 void
 sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int update,
@@ -319,68 +383,13 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
   assert(update >= 0 && update <= 1000);
   assert(range > 0 && range >= initial);
 
-  if (type == SPINLOCK)
-    {
-      hash_list<spinlock> *hl = new hash_list<spinlock>(n_buckets);
-
-      cprintf("initialize %d nodes...", initial);
-      int i = 0;
-      unsigned short seed[3];
-
-      rand_init(seed);
-      while (i < initial)
-        {
-          int value = rand_range(range, seed);
-          auto list = hl->get_list(value % n_buckets);
-
-          if (list->raw_insert(value))
-            i++;
-        }
-      cprintf("done\n");
-
-      // allocate pointer list
-      struct proc **thread_list = new struct proc *[nb_threads];
-      thread_param<spinlock> **param_list = new thread_param<spinlock> *[nb_threads];
-
-      // mile sec
-      u64 initial_time = nsectime();
-      cprintf("Main thread ID: %d\n", myproc()->pid);
-      cprintf("Creating %d threads...", nb_threads);
-      int stop = 0;             // shared by threads
-      for (int i = 0; i < nb_threads; i++)
-        {
-          param_list[i] = new thread_param<spinlock>(n_buckets, nb_threads, update,
-                                                     range, stop, hl);
-        }
-      for (int i = 0; i < nb_threads; i++)
-        {
-        thread_list[i] = threadpin(test<spinlock>, (void*)param_list[i], "test_thread",
-                                   i%(NCPU-1)+1);
-        cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(NCPU-1)+1,
-                thread_list[i]->get_state());
-        }
-      cprintf(" done!\n");
-
-      sleep_usec(initial_time, duration);
-
-      stop = 1;
-      cprintf("join %d threads...\n", nb_threads);
-      for(int i = 0; i < nb_threads; i++)
-        wait(-1, NULL);
-
-      cprintf(" done!\n");
-
-      print_outcome<spinlock>(*hl, param_list, nb_threads, initial, duration);
-
-      // deallocate memory
-      delete hl;
-      for (int j = 0; j < nb_threads; j++)
-        {
-          delete param_list[j];
-        }
-      delete[] thread_list;
-      delete[] param_list;
-    } // spinlock
+  switch (type) {
+  case SPINLOCK:
+    bench<spinlock>(nb_threads, initial, n_buckets, duration, update, range);
+    break;
+  default:
+    break;
+  }
   cprintf("Kernel Level Benchmark END\n");
 }
 //////////////////////////////////////
