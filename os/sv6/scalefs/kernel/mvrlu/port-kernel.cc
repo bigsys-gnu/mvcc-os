@@ -62,7 +62,7 @@ void *port_alloc_x(size_t size, unsigned int flags)
 void port_free(void *ptr)
 {
   int *int_ptr = (int *)ptr;
-  struct alloc_mem *mem = (struct alloc_mem *)(int_ptr - sizeof(int *));
+  struct alloc_mem *mem = (struct alloc_mem *)(int_ptr - sizeof(size_t));
   kmalignfree(mem, 4, mem->size);
 }
 
