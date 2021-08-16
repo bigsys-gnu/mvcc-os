@@ -11,6 +11,7 @@
 #include "futex.h"
 #include "version.hh"
 #include "filetable.hh"
+#include "mvrlu/mvrlu.hpp"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
@@ -21,10 +22,9 @@
 // BENCHMARK TYPES
 /////////////////////////////////////
 enum bench_type {
-  SPINLOCK
+  SPINLOCK,
+  MVRLU
 };
-
-
 //////////////////////////////////////
 // RANDOM FUNCTIONS
 /////////////////////////////////////
@@ -297,6 +297,45 @@ void test<spinlock>(void *param) {
 }
 //////////////////////////////////////
 // SPINLOCK
+/////////////////////////////////////
+//////////////////////////////////////
+// MVRLU
+/////////////////////////////////////
+struct mvrlu_bench {};
+struct mvrlu_node {
+  int value;
+  mvrlu_node *next;
+
+  void *operator new(size_t size) {
+    return mvrlu::mvrlu_alloc<mvrlu_node>();
+  }
+  void operator delete(void *ptr) {
+    mvrlu::mvrlu_free(ptr);
+  }
+};
+// mvrlu::thread_handle<node> h;
+
+template <>
+class list<mvrlu_bench> {
+  mvrlu_node *head_;
+public:
+  list(void):head_(NULL) {}
+  ~list(void) {
+    for (auto iter = head_; iter != NULL; )
+    {
+      auto trash = iter;
+      iter = iter->next;
+      delete trash;
+    }
+  }
+};
+
+template <>
+void test<mvrlu_bench>(void *param) {
+
+}
+//////////////////////////////////////
+// MVRLU
 /////////////////////////////////////
 
 void sleep_usec(u64 initial_time, u64 usec);

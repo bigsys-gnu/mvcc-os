@@ -8,6 +8,11 @@ namespace mvrlu {
   template <typename T> class thread_handle;
   template <typename T> class mvrlu_object;
 
+  inline void
+  mvrlu_free(void *ptr) {
+    ::mvrlu_free(NULL, ptr);
+  }
+
   // call RLU_INIT, RLU_FINISH manually
   // this mvrlu can be applied only one data structure.
   template <typename T>
@@ -23,9 +28,9 @@ namespace mvrlu {
   }
 
   template <typename T>
-  inline T *
-  mvrlu_alloc(std::size_t size) {
-    return (T *) ::mvrlu_alloc(size);
+  inline void *
+  mvrlu_alloc(void) {
+    return (T *) ::mvrlu_alloc(sizeof(T));
   }
 
   template <typename T>
