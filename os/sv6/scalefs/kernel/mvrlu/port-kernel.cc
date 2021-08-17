@@ -159,6 +159,7 @@ int port_create_thread(const char *name, struct task_struct **t,
     port_cond_init(completion);
 
     {
+      snprintf(temp->name, sizeof(temp->name), "%s", name);
       scoped_acquire l(&temp->lock);
       addrun(temp);
     }
