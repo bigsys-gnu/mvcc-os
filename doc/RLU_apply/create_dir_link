@@ -1,0 +1,13 @@
+#!/usr/bin/python3
+
+
+import sys
+
+if __name__ == '__main__':
+    for arg in sys.argv[1:]:
+        print(arg)
+
+    with open("local_dir.sty", "w") as f:
+        for arg in sys.argv[1:]:
+            f.write(f"\\newcommand\{arg}figure{{./{arg}/figures}}\n")
+            f.write(f"\\newcommand\{arg}code{{./{arg}/code}}\n")

@@ -1,0 +1,246 @@
+\documentclass{beamer}
+\title{Review of RCU algorithms}
+\subtitle{Read-Copy Update in HelenOS}
+\usetheme{CambridgeUS}
+\usecolortheme{beaver}
+\usepackage{kotex}
+\usepackage{graphics}
+\usepackage{booktabs}
+\usepackage{listings}
+\usepackage{local_dir}
+\lstset{inputpath=\rcucode/helenOS/,
+  basicstyle=\scriptsize,
+  numbers=left,
+  xleftmargin=10pt,
+  tabsize=2,
+}
+\graphicspath{ {\rcufigure/helenOS/}}
+\author{Chang-Hui Kim}
+
+\begin{document}
+
+\begin{frame}
+  \titlepage
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\section{General purpose user space RCU}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{General purpose user space RCU}
+
+  \begin{itemize}
+  \item separate readers into two groups (prev, cur).
+  \item each group has a counter for the number of readers.
+  \item \texttt{Rcu\_synchronize} waits for both prev, cur group.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Pros}
+
+  \begin{itemize}
+  \item tolerates preemption in read-side critical section.
+  \item need no kernel support.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Cons}
+
+  \begin{itemize}
+  \item readers have to issue a memory barrier both when entering and leaving
+    read-side critical sections.
+  \item grace period may be twice as long as it needs to be in the common case. 
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\section{Signal based user space RCU}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Signal based user space RCU}
+
+  \begin{itemize}
+  \item similar to General URCU.
+  \item in the read side critical section, Memory-barrier will
+    be called only within signal handler.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Pros}
+
+  \begin{itemize}
+  \item light weight read-side critical sections.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Cons}
+
+  \begin{itemize}
+  \item detecting grace periods disrupts readers.
+  \item grace period may be twice as long as it needs to be in the common case.
+  \item requires an implementation of signals.
+  \end{itemize}
+
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\section{Classic kernel RCU}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Classic kernel RCU}
+
+  \begin{itemize}
+  \item every thread in the read-side critical section disables preemption.
+  \item the writer thread registers call-back function.
+  \item timer interrupt handler
+    \begin{itemize}
+    \item batches call-back functions.
+    \item checks the current grace period ended.
+    \item manages grace periods.
+    \end{itemize}
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Pros}
+  
+  \begin{itemize}
+  \item low overhead reader sections.
+  \item low overhead grace period detection.
+  \end{itemize}
+
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Cons}
+
+  \begin{itemize}
+  \item requires a regular sampling tick.
+  \item read-side critical sections may not be preempted.
+  \item grace period detection is held back if threads are alloted larger time quanta
+    that they spend in the kernel.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\section{Huston's RCU}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Huston's RCU}
+
+  \begin{itemize}
+  \item batches call-backs in \texttt{Rcu-Call} until a predefined number
+    of queued callbacks is reached.
+  \item \texttt{Rcu-Read-Unlock} announces quiescent states if a grace period
+    is in progress.
+  \end{itemize}
+
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Pros}
+
+  \begin{itemize}
+  \item no regular sampling tick.
+  \item low latency grace period end detection. (use semaphore)
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Cons}
+
+  \begin{itemize}
+  \item \texttt{Rcu-Read-Unlock} uses the atomic exchange instruction.
+  \item still requires a timer.
+  \item Non-preemptible reader sections.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\section{Podzimek's RCU}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Podzimek's RCU}
+
+  \begin{itemize}
+  \item the first reader notices the start of a new grace period on each CPU.
+  \item announces a quiescent state in \texttt{Rcu-Read-Lock} or \texttt{Rcu-Read-Unlock}.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Pros}
+
+  \begin{itemize}
+  \item Low overhead read-sice critical sections with at most one memory barrier
+    issued by each CPU per grace period.
+  \item No regular sampling timer ticks are required.
+  \item Does not needlessly wake idle CPUs up.
+  \item Works in interrupt handlers.
+  \item No instrumentation of the scheduler or the interrupt dispatching mechanism
+    necessary.
+  \end{itemize}
+  
+\end{frame}
+
+%% -------------------------------------------------------------------------
+
+\begin{frame}[t]
+  \frametitle{Cons}
+
+  \begin{itemize}
+  \item Intrusiveness of the detection depends on cache coherency.
+  \item Read-side critical section may not be preempted.
+  \end{itemize}
+  
+\end{frame}
+
+
+\end{document}
