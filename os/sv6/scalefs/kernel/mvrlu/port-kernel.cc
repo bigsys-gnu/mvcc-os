@@ -3,6 +3,7 @@
 #include "spinlock.hh"
 #include "condvar.hh"
 #include "vmalloc.hh"
+#include "memlayout.h"
 #include "proc.hh"
 #include "cpu.hh"
 #include "mvrlu/arch.h"
@@ -14,8 +15,6 @@
  * Log region
  */
 static unsigned long g_size __read_mostly;
-static char *g_start_addr __read_mostly;
-static char *g_end_addr __read_mostly;
 
 int port_log_region_init(unsigned long size, unsigned long num)
 {
@@ -30,9 +29,7 @@ void port_log_region_destroy(void)
 
 void *port_alloc_log_mem(void)
 {
-  g_start_addr = (char *)vmalloc_raw(g_size, 4, "port log");
-  g_end_addr = g_start_addr + g_size;
-  return (void *)g_start_addr;
+  return vmalloc_raw(g_size, 4, "port log");
 }
 
 void port_free_log_mem(void *addr)
@@ -42,7 +39,8 @@ void port_free_log_mem(void *addr)
 
 int port_addr_in_log_region(void *addr__)
 {
-  return addr__ >= g_start_addr && addr__ < g_end_addr;
+  unsigned long addr = (unsigned long)addr__;
+  return addr >= KVMALLOC && addr < KVMALLOCEND;
 }
 
 /*
