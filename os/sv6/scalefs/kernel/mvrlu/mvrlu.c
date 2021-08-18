@@ -1354,6 +1354,9 @@ void mvrlu_reader_unlock(mvrlu_thread_struct_t *self)
 		if (unlikely(self->log.need_reclaim))
 			log_reclaim(&self->log);
 
+		if (unlikely(log_used(&self->log) >= MVRLU_LOG_LOW_MARK)) {
+            wakeup_qp_thread_for_reclaim();
+		}
 		smp_wmb();
 	}
 
