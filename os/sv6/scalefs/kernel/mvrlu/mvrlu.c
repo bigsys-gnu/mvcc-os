@@ -2,8 +2,12 @@
 #include "mvrlu/mvrlu_i.h"
 #include "mvrlu/debug.h"
 #include "mvrlu/arch.h"
+#ifdef __KERNEL__
 #include "mvrlu/port-kernel.h"
 #include "string.h"
+#else
+#include "mvrlu/port-user.h"
+#endif
 
 #define EBUSY 16
 
@@ -19,6 +23,10 @@ static mvrlu_thread_list_t g_live_threads ____cacheline_aligned2;
 static mvrlu_thread_list_t g_zombie_threads ____cacheline_aligned2;
 static mvrlu_qp_thread_t g_qp_thread ____cacheline_aligned2;
 
+#ifdef MVRLU_ENABLE_STATS
+static mvrlu_stat_t g_stat ____cacheline_aligned2;
+#endif
+
 /*
  * Forward declarations
  */
@@ -26,6 +34,9 @@ static mvrlu_qp_thread_t g_qp_thread ____cacheline_aligned2;
 static void qp_update_qp_clk_for_reclaim(mvrlu_qp_thread_t *qp_thread,
 					 mvrlu_thread_struct_t *thread);
 static int wakeup_qp_thread_for_reclaim(void);
+#ifndef __KERNEL__
+static void print_config(void);
+#endif
 
 /*
  * Clock-related functions
@@ -47,7 +58,7 @@ static volatile unsigned long
 #define advance_clock() smp_faa(&g_wrt_clk, 1)
 #define correct_qp_clk(qp_clk) qp_clk
 #else /* MVRLU_ORDO_TIMESTAMPING */
-#include "ordo_clock.h"
+#include "mvrlu/ordo_clock.h"
 #define gte_clock(__t1, __t2) ordo_gt_clock(__t1, __t2)
 #define lte_clock(__t1, __t2) ordo_lt_clock(__t1, __t2)
 #define get_clock() ordo_get_clock()
@@ -92,6 +103,96 @@ static inline void assert_chs_type(const mvrlu_cpy_hdr_struct_t *chs)
 		     chs->obj_hdr.type == TYPE_COPY ||
 		     chs->obj_hdr.type == TYPE_FREE ||
 		     chs->obj_hdr.type == TYPE_BOGUS);
+}
+
+/*
+ * Statistics functions
+ */
+
+#ifdef MVRLU_ENABLE_STATS
+#define stat_thread_inc(self, x) stat_inc(&(self)->stat, stat_##x)
+#define stat_thread_acc(self, x, y) stat_acc(&(self)->stat, stat_##x, y)
+#define stat_thread_max(self, x, y) stat_max(&(self)->stat, stat_##x, y)
+#define stat_qp_inc(qp, x) stat_inc(&(qp)->stat, stat_##x)
+#define stat_qp_acc(qp, x, y) stat_acc(&(qp)->stat, stat_##x, y)
+#define stat_qp_max(qp, x, y) stat_max(&(qp)->stat, stat_##x, y)
+#define stat_log_inc(log, x) stat_thread_inc(log_to_thread(log), x)
+#define stat_log_acc(log, x, y) stat_thread_acc(log_to_thread(log), x, y)
+#define stat_log_max(log, x, y) stat_thread_max(log_to_thread(log), x, y)
+#define stat_thread_merge(self) stat_atomic_merge(&g_stat, &(self)->stat)
+#define stat_qp_merge(qp) stat_atomic_merge(&g_stat, &(qp)->stat)
+#else /* MVRLU_ENABLE_STATS */
+#define stat_thread_inc(self, x)
+#define stat_thread_acc(self, x, y)
+#define stat_thread_max(self, x, y)
+#define stat_qp_inc(qp, x)
+#define stat_qp_acc(qp, x, y)
+#define stat_qp_max(qp, x, y)
+#define stat_log_inc(log, x)
+#define stat_log_acc(log, x, y)
+#define stat_log_max(log, x, y)
+#define stat_thread_merge(self)
+#define stat_qp_merge(qp)
+#endif /* MVRLU_ENABLE_STATS */
+
+#ifdef MVRLU_ENABLE_STATS
+static const char *stat_get_name(int s)
+{
+/*
+	 * Check out following implementation tricks:
+	 * - C preprocessor applications
+	 *   https://bit.ly/2H1sC5G
+	 * - Stringification
+	 *   https://gcc.gnu.org/onlinedocs/gcc-4.1.2/cpp/Stringification.html
+	 * - Designated Initializers in C
+	 *   https://www.geeksforgeeks.org/designated-initializers-c/
+	 */
+#undef S
+#define S(x) [stat_##x] = #x,
+	static const char *stat_string[stat_max__ + 1] = { STAT_NAMES };
+
+	mvrlu_assert(s >= 0 && s < stat_max__);
+	return stat_string[s];
+}
+
+static void stat_print_cnt(mvrlu_stat_t *stat)
+{
+	int i;
+	for (i = 0; i < stat_max__; ++i) {
+		printf("  %30s = %lu\n", stat_get_name(i), stat->cnt[i]);
+	}
+}
+
+static void stat_reset(mvrlu_stat_t *stat)
+{
+	int i;
+	for (i = 0; i < stat_max__; ++i) {
+		stat->cnt[i] = 0;
+	}
+}
+static void stat_atomic_merge(mvrlu_stat_t *tgt, mvrlu_stat_t *src)
+{
+	int i;
+	for (i = 0; i < stat_max__; ++i) {
+		smp_faa(&tgt->cnt[i], src->cnt[i]);
+	}
+}
+#endif
+
+static inline void stat_inc(mvrlu_stat_t *stat, int s)
+{
+	stat->cnt[s]++;
+}
+
+static inline void stat_acc(mvrlu_stat_t *stat, int s, unsigned long v)
+{
+	stat->cnt[s] += v;
+}
+
+static inline void stat_max(mvrlu_stat_t *stat, int s, unsigned long v)
+{
+	if (v > stat->cnt[s])
+		stat->cnt[s] = v;
 }
 
 /*
@@ -407,6 +508,7 @@ static void free_obj(mvrlu_cpy_hdr_struct_t *chs)
 static inline unsigned long log_used(mvrlu_log_t *log)
 {
 	unsigned long used = log->tail_cnt - log->head_cnt;
+	stat_log_max(log, max_log_used_bytes, used);
 	return used;
 }
 
@@ -839,10 +941,12 @@ static void log_reclaim(mvrlu_log_t *log)
 			case TYPE_COPY:
 				if (try_writeback && try_writeback_obj(chs))
 					try_detach_obj(chs);
+				stat_log_inc(log, n_reclaim_copy);
 				break;
 			case TYPE_FREE:
 				if (reclaim) {
 					free_obj(chs);
+					stat_log_inc(log, n_reclaim_free);
 				}
 				break;
 			case TYPE_BOGUS:
@@ -857,7 +961,9 @@ static void log_reclaim(mvrlu_log_t *log)
 		mvrlu_assert(start_cnt <= log->tail_cnt);
 		if (reclaim)
 			log->head_cnt = start_cnt;
+		stat_log_inc(log, n_reclaim_wrt_set);
 	}
+	stat_log_inc(log, n_reclaim);
 	log->need_reclaim = 0;
 
 	unlock(&log->reclaim_lock);
@@ -954,8 +1060,10 @@ static void qp_detect(mvrlu_qp_thread_t *qp_thread)
 
 	qp_clk = get_clock();
 	qp_init(qp_thread, qp_clk);
+	stat_qp_inc(qp_thread, n_qp_detect);
 	if (!qp_thread->need_reclaim) {
 		qp_take_nap(qp_thread);
+		stat_qp_inc(qp_thread, n_qp_nap);
 	}
 	qp_wait(qp_thread, qp_clk);
 	qp_thread->qp_clk = correct_qp_clk(qp_clk);
@@ -981,6 +1089,7 @@ retry:
 			/* Help reclaiming */
 			if (thread->log.need_reclaim) {
 				log_reclaim(&thread->log);
+				stat_qp_inc(qp_thread, n_qp_help_reclaim);
 			}
 		}
 
@@ -1019,6 +1128,8 @@ retry:
 			if (thread->log.buffer) {
 				port_free_log_mem((void *)thread->log.buffer);
 				thread->log.buffer = NULL;
+				stat_thread_merge(thread);
+				stat_qp_inc(qp_thread, n_qp_zombie_reclaim);
 			}
 
 			/* If it is a dead zombie, reap */
@@ -1111,10 +1222,18 @@ static void __qp_thread_main(void *arg)
 	}
 }
 
+#ifdef __KERNEL__
 static void qp_thread_main(void *arg)
 {
 	__qp_thread_main(arg);
 }
+#else
+static void *qp_thread_main(void *arg)
+{
+	__qp_thread_main(arg);
+	return NULL;
+}
+#endif
 
 static int init_qp_thread(mvrlu_qp_thread_t *qp_thread)
 {
@@ -1147,6 +1266,7 @@ static void finish_qp_thread(mvrlu_qp_thread_t *qp_thread)
 	port_wait_for_finish(&qp_thread->thread, &qp_thread->completion);
 	port_mutex_destroy(&qp_thread->cond_mutex);
 	port_cond_destroy(&qp_thread->cond);
+	stat_qp_merge(qp_thread);
 }
 
 static inline int wakeup_qp_thread_for_reclaim(void)
@@ -1252,6 +1372,7 @@ void mvrlu_thread_finish(mvrlu_thread_struct_t *self)
 	if (self->log.head_cnt == self->log.tail_cnt) {
 		port_free_log_mem((void *)self->log.buffer);
 		self->log.buffer = NULL;
+		stat_thread_merge(self);
 	}
 	/* Otherwise add it to the zombie list to reclaim the log later */
 	else {
@@ -1308,6 +1429,7 @@ void mvrlu_reader_lock(mvrlu_thread_struct_t *self)
 	if (unlikely(log_used(&self->log) >= MVRLU_LOG_HIGH_MARK)) {
 		do {
 			log_reclaim_force(&self->log);
+			stat_thread_inc(self, n_high_mark_block);
 		} while (log_used(&self->log) >= MVRLU_LOG_HIGH_MARK);
 	}
 
@@ -1323,6 +1445,7 @@ void mvrlu_reader_lock(mvrlu_thread_struct_t *self)
 	/* Get the latest view */
 	smp_rmb();
 
+	stat_thread_inc(self, n_starts);
 	mvrlu_assert(self->log.cur_wrt_set == NULL);
 	mvrlu_assert(self->free_ptrs.num_ptrs == 0);
 }
@@ -1355,11 +1478,14 @@ void mvrlu_reader_unlock(mvrlu_thread_struct_t *self)
 			log_reclaim(&self->log);
 
 		if (unlikely(log_used(&self->log) >= MVRLU_LOG_LOW_MARK)) {
-            wakeup_qp_thread_for_reclaim();
+			if (wakeup_qp_thread_for_reclaim()) {
+				stat_thread_inc(self, n_low_mark_wakeup);
+			}
 		}
 		smp_wmb();
 	}
 
+	stat_thread_inc(self, n_finish);
 	mvrlu_assert(self->log.cur_wrt_set == NULL);
 	mvrlu_assert(self->free_ptrs.num_ptrs == 0);
 }
@@ -1383,6 +1509,7 @@ void mvrlu_abort(mvrlu_thread_struct_t *self)
 	/* Prepare next mvrlu_reader_lock() by performing memory barrier. */
 	smp_mb();
 
+	stat_thread_inc(self, n_aborts);
 	mvrlu_assert(self->log.cur_wrt_set == NULL);
 	mvrlu_assert(self->free_ptrs.num_ptrs == 0);
 }
@@ -1548,6 +1675,47 @@ void mvrlu_print_stats(void)
 	printf("-------------------------------------------------\n");
 	stat_print_cnt(&g_stat);
 	printf("-------------------------------------------------\n");
+#endif
+}
+
+static void print_config(void)
+{
+	printf(
+#ifdef MVRLU_ORDO_TIMESTAMPING
+	       "  MVRLU_ORDO_TIMESTAMPING = 1\n"
+#else
+	       "  MVRLU_ORDO_TIMESTAMPING = 0\n"
+#endif
+	       );
+	printf( "  MVRLU_LOG_SIZE = %ld\n" ,
+	       MVRLU_LOG_SIZE);
+	printf(
+	       "  MVRLU_LOG_LOW_MARK = %ld\n" ,
+	       MVRLU_LOG_LOW_MARK);
+	printf(
+	       "  MVRLU_LOG_HIGH_MARK = %ld\n" ,
+	       MVRLU_LOG_HIGH_MARK);
+#ifdef MVRLU_ENABLE_ASSERT
+	printf(MVRLU_COLOR_RED "  MVRLU_ENABLE_ASSERT is on.          "
+			       "DO NOT USE FOR BENCHMARK!\n" );
+#endif
+#ifdef MVRLU_ENABLE_FREE_POISIONING
+	printf(MVRLU_COLOR_RED "  MVRLU_ENABLE_FREE_POISIONING is on. "
+			       "DO NOT USE FOR BENCHMARK!\n" );
+#endif
+#ifdef MVRLU_ENABLE_STATS
+	printf(MVRLU_COLOR_RED "  MVRLU_ENABLE_STATS is on.       "
+			       "DO NOT USE FOR BENCHMARK!\n" );
+#endif
+#ifdef MVRLU_TIME_MEASUREMENT
+	printf(MVRLU_COLOR_RED "  MVRLU_TIME_MEASUREMENT is on.       "
+			       "DO NOT USE FOR BENCHMARK!\n" );
+#endif
+#if defined(MVRLU_ENABLE_TRACE_0) || defined(MVRLU_ENABLE_TRACE_1) ||          \
+	defined(MVRLU_ENABLE_TRACE_2) || defined(MVRLU_ENABLE_TRACE_3)
+	printf(MVRLU_COLOR_MAGENTA
+	       "  MVRLU_ENABLE_TRACE_*  is on.        "
+	       "IT MAY AFFECT BENCHMARK RESULTS!\n" );
 #endif
 }
 #endif
