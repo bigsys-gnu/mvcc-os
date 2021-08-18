@@ -270,6 +270,7 @@ int main(int argc, char **argv)
     printf("%d Option is inserted\n", argc - 1);
     break;
   }
+  printf("\n#### mvcc bench ####\n");
   printf( "-Nb threads   : %d\n", nb_threads);
   printf( "-Initial size : %d\n", initial);
   printf( "-Buckets      : %d\n", n_buckets);
@@ -387,6 +388,7 @@ int main(int argc, char **argv)
   }
   exp = initial + total_variation;
 
+  printf("\n#### total ####\n");
   printf("Set size      : %lu (expected: %lu)\n", total_size, exp);
   printf("Duration      : %d (ms)\n", duration);
   iv = (reads + updates) * 1000.0 / duration;
