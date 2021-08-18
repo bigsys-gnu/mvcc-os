@@ -114,11 +114,11 @@ struct thread_param {
   int nb_threads;
   int update;
   int range;
-  int variation;
-  int result_add;
-  int result_remove;
-  int result_contains;
-  int result_found;
+  unsigned long variation;
+  unsigned long result_add;
+  unsigned long result_remove;
+  unsigned long result_contains;
+  unsigned long result_found;
   int &stop;
   unsigned short seed[3];
   hash_list<T> *hl;
@@ -639,15 +639,15 @@ void sleep_usec(u64 initial_time, u64 usec) {
 
 template <typename T>
 void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration) {
-  int reads = 0, updates = 0, total_variation = 0;
+  unsigned long reads = 0, updates = 0, total_variation = 0;
 
   for (int i = 0; i < nb_threads; i++)
     {
       cprintf( "Thread %d\n", i);
-      cprintf( "  #add        : %d\n", param_list[i]->result_add);
-      cprintf( "  #remove     : %d\n", param_list[i]->result_remove);
-      cprintf( "  #contains   : %d\n", param_list[i]->result_contains);
-      cprintf( "  #found      : %d\n", param_list[i]->result_found);
+      cprintf( "  #add        : %lu\n", param_list[i]->result_add);
+      cprintf( "  #remove     : %lu\n", param_list[i]->result_remove);
+      cprintf( "  #contains   : %lu\n", param_list[i]->result_contains);
+      cprintf( "  #found      : %lu\n", param_list[i]->result_found);
       reads += param_list[i]->result_found;
       updates += (param_list[i]->result_add + param_list[i]->result_remove);
       total_variation += param_list[i]->variation;
@@ -663,10 +663,10 @@ void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threa
   cprintf( "Duration      : %d (ms)\n", duration);
   unsigned long iv = reads * 1000.0 / duration;
   unsigned long fv = (unsigned long)(reads * 1000.0 / duration * 10) % 10;
-  cprintf( "#read ops     : %d (%lu.%lu / s)\n", reads, iv, fv);
+  cprintf( "#read ops     : %lu (%lu.%lu / s)\n", reads, iv, fv);
   iv = updates * 1000.0 / duration;
   fv = (unsigned long)(updates * 1000.0 / duration * 10) % 10;
-  cprintf( "#update ops   : %d (%lu.%lu / s)\n", updates, iv, fv);
+  cprintf( "#update ops   : %lu (%lu.%lu / s)\n", updates, iv, fv);
 
   if(exp != total_size)
   {
