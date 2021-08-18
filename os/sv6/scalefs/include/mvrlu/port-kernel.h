@@ -60,6 +60,8 @@ void port_initiate_wakeup(struct mutex *mutex,
 void port_initiate_nap(struct mutex *mutex, struct completion *cond,
                               unsigned long usecs);
 
+void port_print_str(const char *str, ...);
+
 #ifdef __cplusplus
 }
 #endif

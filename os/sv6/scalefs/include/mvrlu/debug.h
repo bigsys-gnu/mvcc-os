@@ -126,4 +126,11 @@
 #define trace_3(self, fmt, ...)
 #define trace_3_global(fmt, ...)
 #endif
+
+#ifdef __KERNEL__
+#define debug_msg(format, ...)\
+  port_print_str("pid: (%d) " format, __VA_ARGS__)
+#else
+#define debug_msg(...)
+#endif
 #endif /* _DEBUG_H */

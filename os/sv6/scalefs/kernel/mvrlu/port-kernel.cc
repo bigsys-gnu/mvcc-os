@@ -4,6 +4,7 @@
 #include "condvar.hh"
 #include "vmalloc.hh"
 #include "proc.hh"
+#include "cpu.hh"
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
 
@@ -208,4 +209,10 @@ void port_initiate_nap(struct mutex *mutex, struct completion *cond,
     if (until > nsectime())
       cond_var->sleep_to(spin, until);
   }
+}
+
+void port_print_str(const char *str, ...)
+{
+  va_list ap;
+  cprintf(str, myproc()->pid, ap);
 }
