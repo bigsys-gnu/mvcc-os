@@ -512,21 +512,6 @@ void test<mvrlu_bench>(void *param) {
   cprintf("thread %d end\n", myproc()->pid);
 }
 
-template <>
-void bench_init<mvrlu_bench>(void)
-{
-  RLU_INIT();
-}
-
-template <>
-void bench_finish<mvrlu_bench>(void)
-{
-  RLU_FINISH();
-}
-//////////////////////////////////////
-// MVRLU END
-/////////////////////////////////////
-
 void sleep_usec(u64 initial_time, u64 usec);
 
 template <typename T>

@@ -169,27 +169,21 @@ int port_create_thread(const char *name, struct task_struct **t,
                        void (*fn)(void *), void *arg,
                        struct completion *completion)
 {
-  struct proc *temp = threadalloc(fn, arg);
+  struct proc *temp = threadpin(fn, arg, name, 1);
   if (temp != NULL)
   {
     port_cond_init(completion);
-
-    {
-      snprintf(temp->name, sizeof(temp->name), "%s", name);
-      scoped_acquire l(&temp->lock);
-      addrun(temp);
-    }
     *t = (struct task_struct *)temp;
     return 0;
   }
   return -11;
 }
 
-void port_finish_thread(struct completion *completion)
-{
-  struct condvar *cond = (struct condvar *) completion->cond_obj;
-  cond->wake_all();
-}
+// void port_finish_thread(struct completion *completion)
+// {
+//   struct condvar *cond = (struct condvar *) completion->cond_obj;
+//   cond->wake_all();
+// }
 
 void port_wait_for_finish(void *x, struct completion *completion)
 {
