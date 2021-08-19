@@ -1221,6 +1221,7 @@ static void __qp_thread_main(void *arg)
 		qp_thread->qp_clk = get_clock();
 		qp_reap_zombie_threads(qp_thread);
 	}
+    port_finish_thread(&qp_thread->completion);
 }
 
 #ifdef __KERNEL__

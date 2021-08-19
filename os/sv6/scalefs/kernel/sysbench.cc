@@ -62,6 +62,7 @@ static inline int rand_range(int n, unsigned short *seed)
   return v;
 }
 ////////////////////////////////////////////////////////
+int stop = 0;             // shared by threads
 
 struct node {
   node *next;
@@ -507,7 +508,7 @@ void test<mvrlu_bench>(void *param) {
           p_data->result_found++;
         }
     }
-  handle->~thread_handle<mvrlu_node>();
+  delete handle;
   cprintf("thread %d end\n", myproc()->pid);
 }
 
@@ -580,8 +581,8 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 
   stop = 1;
   cprintf("join %d threads...\n", nb_threads);
-  for(int i = 0; i < nb_threads; i++)
-    wait(-1, NULL);
+
+  sleep_usec(nsectime(), 2000); // wait for threads
 
   bench_finish<T>();
   cprintf(" done!\n");

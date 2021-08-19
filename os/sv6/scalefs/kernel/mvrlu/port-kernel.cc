@@ -9,6 +9,15 @@
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
 
+#ifdef SPINLOCK_DEBUG
+#define lock_print(lock)\
+  cprintf("%s (%d): in %s name: %s\n",          \
+          myproc()->name, myproc()->pid,        \
+          __FUNCTION__, lock->name)
+#else
+#define lock_print(lock)
+#endif
+
 #define GET_MEM(PTR) \
   ((struct alloc_mem *) ((char *) PTR - sizeof(unsigned long)))
 /*
@@ -68,7 +77,10 @@ void port_free(void *ptr)
 
 void port_cpu_relax_and_yield(void)
 {
-  yield();
+  if (mycpu()->ncli == 0)
+  {
+    yield();
+  }
   cpu_relax();
 }
 
@@ -88,18 +100,21 @@ void port_spin_destroy(spinlock_t *lock)
 void port_spin_lock(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
+  lock_print(l);
   l->acquire();
 }
 
 int port_spin_trylock(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
+  lock_print(l);
   return l->try_acquire();
 }
 
 void port_spin_unlock(spinlock_t *lock)
 {
   spinlock *l = (spinlock *)lock->spin_obj;
+  lock_print(l);
   return l->release();
 }
 
@@ -122,6 +137,7 @@ int port_mutex_destroy(struct mutex *mutex)
 int port_mutex_lock(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
+  lock_print(l);
   l->acquire();
   return 1;
 }
@@ -129,6 +145,7 @@ int port_mutex_lock(struct mutex *mutex)
 int port_mutex_unlock(struct mutex *mutex)
 {
   spinlock *l = (spinlock *)mutex->mutex_obj;
+  lock_print(l);
   l->release();
   return 1;
 }
@@ -194,10 +211,6 @@ void port_initiate_nap(struct mutex *mutex, struct completion *cond,
                        unsigned long usecs)
 {
   struct condvar *cond_var = (struct condvar *) cond->cond_obj;
-
-  delete cond_var;
-  cond_var = new condvar("port cond");
-  cond->cond_obj = (void *) cond_var;
 
   {
     struct spinlock *spin = (struct spinlock *)mutex->mutex_obj;

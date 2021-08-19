@@ -27,7 +27,7 @@
 #define NDISK         8  // maximum number of hard disks in the machine
 #define USE_SATA_NCQ  0  // Native Command Queuing for SATA hard disks
 #define VERBOSE       0  // print kernel diagnostics
-#define SPINLOCK_DEBUG DEBUG // Debug spin locks
+/* #define SPINLOCK_DEBUG DEBUG // Debug spin locks */
 #define RCU_TYPE_DEBUG DEBUG
 #define LOCKSTAT      DEBUG
 #define ALLOC_MEMSET  DEBUG
