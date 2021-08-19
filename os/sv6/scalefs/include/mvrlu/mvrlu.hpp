@@ -3,6 +3,7 @@
 #include "mvrlu.h"
 #include "mvrlu_i.h"
 #include "cpputil.hh"
+#include "mvrlu/port-kernel.h"
 #include <cstddef>
 
 namespace mvrlu {
@@ -51,7 +52,7 @@ namespace mvrlu {
 
     static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
       assert(nbytes == sizeof(thread_handle<T>));
-      return kmalloc(sizeof(thread_handle<T>), "thread_handle");
+      return port_alloc_x(sizeof(thread_handle<T>), 0);
     }
 
     static void* operator new(unsigned long nbytes) {
