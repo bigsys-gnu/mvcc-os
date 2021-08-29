@@ -547,7 +547,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   u64 initial_time = nsectime();
   cprintf("Main thread ID: %d\n", myproc()->pid);
   cprintf("Creating %d threads...", nb_threads);
-  int stop = 0;             // shared by threads
+
   for (int i = 0; i < nb_threads; i++)
   {
     param_list[i] = new thread_param<T>(n_buckets, nb_threads, update,
@@ -567,7 +567,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   stop = 1;
   cprintf("join %d threads...\n", nb_threads);
 
-  sleep_usec(nsectime(), 2000); // wait for threads
+  sleep_usec(nsectime(), 4000); // wait for threads
 
   bench_finish<T>();
   cprintf(" done!\n");
@@ -607,6 +607,7 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
     bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
     break;
   }
+  stop = 0;
   cprintf("Kernel Level Benchmark END\n");
 }
 //////////////////////////////////////
