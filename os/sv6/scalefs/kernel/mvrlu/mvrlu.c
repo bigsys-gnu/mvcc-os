@@ -5,6 +5,8 @@
 #ifdef __KERNEL__
 #include "mvrlu/port-kernel.h"
 #include "string.h"
+#define printf(...)\
+  port_print_str(__VA_ARGS__)
 #else
 #include "mvrlu/port-user.h"
 #endif
@@ -35,9 +37,7 @@ static mvrlu_stat_t g_stat ____cacheline_aligned2;
 static void qp_update_qp_clk_for_reclaim(mvrlu_qp_thread_t *qp_thread,
 					 mvrlu_thread_struct_t *thread);
 static int wakeup_qp_thread_for_reclaim(void);
-#ifndef __KERNEL__
 static void print_config(void);
-#endif
 
 /*
  * Clock-related functions
@@ -1212,8 +1212,8 @@ static void __qp_thread_main(void *arg)
 			reclaim_done = 0;
 			qp_trigger_reclaim(qp_thread);
 		}
-	}
-
+    }
+    printf("qp die!\n");
 	/* This is the final reclamation so we should completely reclaim
 	 * all logs. To do that, we have to reclaim twice because we need
 	 * two qp duration for complete reclamation. */
@@ -1247,6 +1247,7 @@ static int init_qp_thread(mvrlu_qp_thread_t *qp_thread)
 				&qp_thread_main, qp_thread,
 				&qp_thread->completion);
 	if (rc) {
+        printf("Error creating builder thread: %d\n", rc);
 		return rc;
 	}
 	return 0;
@@ -1306,10 +1307,12 @@ int mvrlu_init(void)
 	init_thread_list(&g_zombie_threads);
 	rc = port_log_region_init(MVRLU_LOG_SIZE, MVRLU_MAX_THREAD_NUM);
 	if (rc) {
+		printf("Fail to initialize a log region\n");
 		return rc;
 	}
 	rc = init_qp_thread(&g_qp_thread);
 	if (rc) {
+		printf("Fail to initialize a qp thread\n");
 		return rc;
 	}
 
@@ -1661,7 +1664,6 @@ void mvrlu_flush_log(mvrlu_thread_struct_t *self)
 #endif
 }
 
-#ifndef __KERNEL__
 void mvrlu_print_stats(void)
 {
 	printf("=================================================\n");
@@ -1719,4 +1721,3 @@ static void print_config(void)
 	       "IT MAY AFFECT BENCHMARK RESULTS!\n" );
 #endif
 }
-#endif

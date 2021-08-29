@@ -4,7 +4,7 @@
 #include "arch.h"
 #include "mvrlu_i.h"
 
-//#define MVRLU_ENABLE_ASSERT
+/* #define MVRLU_ENABLE_ASSERT */
 //#define MVRLU_ENABLE_FREE_POISIONING
 /* #define MVRLU_ENABLE_STATS */
 //#define MVRLU_TIME_MEASUREMENT
@@ -13,7 +13,7 @@
 
 #ifdef __KERNEL__
 #undef MVRLU_TIME_MEASUREMENT
-#undef MVRLU_ENABLE_STATS
+/* #undef MVRLU_ENABLE_STATS */
 #endif
 
 #define MVRLU_FREE_POSION ((unsigned char)(0xbd))
@@ -47,21 +47,17 @@
 #ifdef MVRLU_ENABLE_ASSERT
 #define mvrlu_assert(cond)                                                     \
 	if (unlikely(!(cond))) {                                               \
-		extern void mvrlu_assert_fail(void);                           \
 		printf("\n-----------------------------------------------\n"); \
 		printf("\nAssertion failure: %s:%d '%s'\n", __FILE__,          \
 		       __LINE__, #cond);                                       \
-		mvrlu_assert_fail();                                           \
 	}
 
 #define mvrlu_assert_msg(cond, self, fmt, ...)                                 \
 	if (unlikely(!(cond))) {                                               \
-		extern void mvrlu_assert_fail(void);                           \
 		printf("\n-----------------------------------------------\n"); \
 		printf("\nAssertion failure: %s:%d '%s'\n", __FILE__,          \
 		       __LINE__, #cond);                                       \
 		MVRLU_TRACE(self, fmt, ##__VA_ARGS__);                         \
-		mvrlu_assert_fail();                                           \
 	}
 #else
 #define mvrlu_assert(cond)
@@ -76,19 +72,15 @@
 
 #define mvrlu_panic(cond)                                                      \
 	if (unlikely(!(cond))) {                                               \
-		extern void mvrlu_assert_fail(void);                           \
 		printf("\n-----------------------------------------------\n"); \
 		printf("\nPanic!: %s:%d '%s'\n", __FILE__, __LINE__, #cond);   \
-		mvrlu_assert_fail();                                           \
 	}
 
 #define mvrlu_panic_msg(cond, self, fmt, ...)                                  \
 	if (unlikely(!(cond))) {                                               \
-		extern void mvrlu_assert_fail(void);                           \
 		printf("\n-----------------------------------------------\n"); \
 		printf("\nPanic!: %s:%d '%s'\n", __FILE__, __LINE__, #cond);   \
 		MVRLU_TRACE(self, fmt, ##__VA_ARGS__);                         \
-		mvrlu_assert_fail();                                           \
 	}
 
 #define mvrlu_warning(cond) mvrlu_assert(cond)
@@ -129,7 +121,7 @@
 
 #ifdef __KERNEL__
 #define debug_msg(format, ...)\
-  port_print_str("pid: (%d) " format, __VA_ARGS__)
+  port_print_str("pid: (%d) " format, myproc()->pid, __VA_ARGS__)
 #else
 #define debug_msg(...)
 #endif
