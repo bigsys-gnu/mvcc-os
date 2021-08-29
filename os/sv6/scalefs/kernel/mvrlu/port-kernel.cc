@@ -19,7 +19,7 @@
 #endif
 
 #define GET_MEM(PTR) \
-  ((struct alloc_mem *) ((char *) PTR - sizeof(unsigned long)))
+  ((struct alloc_mem *) (((char *) PTR) - sizeof(unsigned long)))
 /*
  * Log region
  */
@@ -28,6 +28,7 @@ static unsigned long g_size __read_mostly;
 int port_log_region_init(unsigned long size, unsigned long num)
 {
   g_size = size;
+  cprintf("g_size = %lu\n", size);
   return 0;
 }
 
@@ -48,7 +49,7 @@ void port_free_log_mem(void *addr)
 
 int port_addr_in_log_region(void *addr__)
 {
-  unsigned long addr = (unsigned long)addr__;
+  unsigned long long addr = (unsigned long long)addr__;
   return addr >= KVMALLOC && addr < KVMALLOCEND;
 }
 
@@ -169,7 +170,7 @@ int port_create_thread(const char *name, struct task_struct **t,
                        void (*fn)(void *), void *arg,
                        struct completion *completion)
 {
-  struct proc *temp = threadpin(fn, arg, name, 1);
+  struct proc *temp = threadpin(fn, arg, name, 0);
   if (temp != NULL)
   {
     port_cond_init(completion);
@@ -219,5 +220,5 @@ void port_initiate_nap(struct mutex *mutex, struct completion *cond,
 void port_print_str(const char *str, ...)
 {
   va_list ap;
-  cprintf(str, myproc()->pid, ap);
+  cprintf(str, ap);
 }
