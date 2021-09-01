@@ -465,6 +465,16 @@ public:
 };
 
 template <>
+void bench_init<mvrlu_bench>(void) {
+  mvrlu_init();
+}
+
+template <>
+void bench_finish<mvrlu_bench>(void) {
+  mvrlu_finish();
+}
+
+template <>
 void test<mvrlu_bench>(void *param) {
   int op, bucket, value;
   auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);

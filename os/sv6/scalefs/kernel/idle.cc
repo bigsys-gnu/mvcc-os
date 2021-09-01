@@ -85,7 +85,7 @@ idleloop(void)
         asm volatile("hlt");
     }
   }
-  mvrlu_finish();
+  // mvrlu_finish();
 }
 
 void
