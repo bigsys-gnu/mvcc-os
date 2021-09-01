@@ -50,7 +50,7 @@ void port_cond_destroy(struct completion *cond);
 int port_create_thread(const char *name, struct task_struct **t,
                        void (*fn)(void *), void *arg, struct completion *completion);
 
-/* void port_finish_thread(struct completion *completion); */
+void port_finish_thread(struct completion *completion);
 
 void port_wait_for_finish(void *x, struct completion *completion);
 

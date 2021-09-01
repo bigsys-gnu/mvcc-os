@@ -180,11 +180,11 @@ int port_create_thread(const char *name, struct task_struct **t,
   return -11;
 }
 
-// void port_finish_thread(struct completion *completion)
-// {
-//   struct condvar *cond = (struct condvar *) completion->cond_obj;
-//   cond->wake_all();
-// }
+void port_finish_thread(struct completion *completion)
+{
+  struct condvar *cond = (struct condvar *) completion->cond_obj;
+  cond->wake_all();
+}
 
 void port_wait_for_finish(void *x, struct completion *completion)
 {

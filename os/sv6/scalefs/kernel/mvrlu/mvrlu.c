@@ -1213,7 +1213,6 @@ static void __qp_thread_main(void *arg)
 			qp_trigger_reclaim(qp_thread);
 		}
     }
-    printf("qp die!\n");
 	/* This is the final reclamation so we should completely reclaim
 	 * all logs. To do that, we have to reclaim twice because we need
 	 * two qp duration for complete reclamation. */
@@ -1221,6 +1220,7 @@ static void __qp_thread_main(void *arg)
 		qp_thread->qp_clk = get_clock();
 		qp_reap_zombie_threads(qp_thread);
 	}
+    port_finish_thread(&qp_thread->completion);
 }
 
 #ifdef __KERNEL__

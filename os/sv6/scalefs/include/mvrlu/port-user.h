@@ -214,10 +214,10 @@ static int port_create_thread(const char *name, pthread_t *t,
 	return pthread_create(t, NULL, fn, arg);
 }
 
-/* static void port_finish_thread(void *x) */
-/* { */
-/* 	/\* do nothing *\/ */
-/* } */
+static void port_finish_thread(void *x)
+{
+	/* do nothing */
+}
 
 static void port_wait_for_finish(pthread_t *t, void *x)
 {
