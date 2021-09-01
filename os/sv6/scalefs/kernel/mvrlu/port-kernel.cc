@@ -20,6 +20,8 @@
 
 #define GET_MEM(PTR) \
   ((struct alloc_mem *) (((char *) PTR) - sizeof(unsigned long)))
+
+#define MEMORY_ALIGN 8
 /*
  * Log region
  */
@@ -28,7 +30,6 @@ static unsigned long g_size __read_mostly;
 int port_log_region_init(unsigned long size, unsigned long num)
 {
   g_size = size;
-  cprintf("g_size = %lu\n", size);
   return 0;
 }
 
@@ -65,7 +66,7 @@ void *port_alloc_x(size_t size, unsigned int flags)
 {
   struct alloc_mem *mem;
 
-  kmalign((void **)&mem, 4, size + sizeof(size_t), "port mem");
+  kmalign((void **)&mem, MEMORY_ALIGN, size + sizeof(size_t), "port mem");
   mem->size = size + sizeof(size_t);
   return mem->byte;
 }
@@ -73,7 +74,7 @@ void *port_alloc_x(size_t size, unsigned int flags)
 void port_free(void *ptr)
 {
   struct alloc_mem *mem = GET_MEM(ptr);
-  kmalignfree(mem, 4, mem->size);
+  kmalignfree(mem, MEMORY_ALIGN, mem->size);
 }
 
 void port_cpu_relax_and_yield(void)
