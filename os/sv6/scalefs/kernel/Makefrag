@@ -47,6 +47,7 @@ OBJS = \
 	sysfile.o \
 	sysproc.o \
 		sysbench.o \
+		sysbench_rcu_ch.o \
 	syssocket.o\
 	uart.o \
         user.o \
