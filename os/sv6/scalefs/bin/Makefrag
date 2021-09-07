@@ -9,7 +9,6 @@ endif
 
 UPROGS_BIN= \
         bench \
-	kbench \
 	kbench_rcu_ch \
 	cat \
         du \
