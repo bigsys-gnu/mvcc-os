@@ -597,17 +597,18 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 //SYSCALL
 void
 sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int update,
-              int range)
+              int bench_type)
 {
-  enum bench_type type = MVRLU;
+  enum bench_type type = (enum bench_type) bench_type;
   cprintf("Run Kernel Level Benchmark\n");
+  int range = initial * 2;
 
   assert(n_buckets >= 1);
   assert(duration >= 0);
   assert(initial >= 0);
   assert(nb_threads > 0);
   assert(update >= 0 && update <= 1000);
-  assert(range > 0 && range >= initial);
+  // assert(range > 0 && range >= initial);
 
   switch (type) {
   case SPINLOCK:
