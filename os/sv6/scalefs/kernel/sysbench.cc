@@ -11,45 +11,23 @@
 #include "futex.h"
 #include "version.hh"
 #include "filetable.hh"
+#include "mvrlu/mvrlu.hpp"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
-#define MAX_BUCKETS (128)
-#define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
-#define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
-
-typedef struct node {
-    int value;
-    struct node *next;
-} node_t;
-
-typedef struct list {
-    spinlock lk;
-    node_t *head;
-} list_t;
-
-typedef struct hash_list {
-	int n_buckets;
-	list_t *buckets[MAX_BUCKETS];  
-} hash_list_t;
-
-typedef struct thread_param {
-	int n_buckets;
-	int initial;
-	int nb_threads;
-    int update;
-    int range;
-    int variation;
-    int result_add;
-    int result_remove;
-    int result_contains;
-    int result_found;
-    int *stop;
-    hash_list_t *p_hash_list;
-} thread_param_t;
-
+#define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
+//////////////////////////////////////
+// BENCHMARK TYPES
+/////////////////////////////////////
+enum bench_type {
+  SPINLOCK,
+  MVRLU
+};
+//////////////////////////////////////
+// RANDOM FUNCTIONS
+/////////////////////////////////////
 uint64_t
 u_rand(void)
 {
@@ -57,331 +35,641 @@ u_rand(void)
   return (t >= 0) ? t : 0 - t;
 }
 
+static inline int MarsagliaXORV (int x) { 
+  if (x == 0) x = 1 ; 
+  x ^= x << 6;
+  x ^= ((unsigned)x) >> 21;
+  x ^= x << 7 ; 
+  return x ;        // use either x or x & 0x7FFFFFFF
+}
 
-// Return a random integer between a given range.
-int randomrange(int lo, int hi)
+static inline int MarsagliaXOR (int * seed) {
+  int x = MarsagliaXORV(*seed);
+  *seed = x ; 
+  return x & 0x7FFFFFFF;
+}
+
+static inline void rand_init(unsigned short *seed)
 {
-  if (hi < lo) {
-    int tmp = lo;
-    lo = hi;
-    hi = tmp;
+  seed[0] = (unsigned short)u_rand();
+  seed[1] = (unsigned short)u_rand();
+  seed[2] = (unsigned short)u_rand();
+}
+
+static inline int rand_range(int n, unsigned short *seed)
+{
+  int v = MarsagliaXOR((int *)seed) % n;
+  return v;
+}
+////////////////////////////////////////////////////////
+int stop = 0;             // shared by threads
+
+struct node {
+  node *next;
+  int value;
+
+  node(int val) : next(NULL), value(val) {}
+
+  NEW_DELETE_OPS(node);
+};
+
+template <typename T>
+class list {
+  int list_insert(T& data, int key) { return 0; }
+  int list_delete(T& data, int key) { return 0; }
+  int list_find(T& data, int key) { return 0; }
+  int get_total_node_number(void) { return 0; }
+};
+
+template <typename T>
+class hash_list {
+  int n_buckets_;
+  list<T> **buckets_;
+public:
+  hash_list(int n_buckets): n_buckets_(n_buckets)
+  {
+
+    buckets_ = new list<T> *[n_buckets];
+    for (int i = 0; i < n_buckets; i++)
+      buckets_[i] = new list<T>();
   }
-  int range = hi - lo + 1;
-  return u_rand() % (range) + lo;
-}
+  ~hash_list(void) {
+    for (int i = 0; i < n_buckets_; i++)
+      {
+        delete buckets_[i];
+      }
+    delete[] buckets_;
+  }
 
+  list<T> *
+  get_list(int key) {
+    return buckets_[key];
+  }
 
+  NEW_DELETE_OPS(hash_list<T>);
+};
 
-int list_insert(int key, list_t *list)
-{
-    node_t *prev = NULL, *cur = NULL, *new_node = NULL;
-    int ret = 1;
+template <typename T>
+struct thread_param {
+  int n_buckets;
+  int nb_threads;
+  int update;
+  int range;
+  unsigned long variation;
+  unsigned long result_add;
+  unsigned long result_remove;
+  unsigned long result_contains;
+  unsigned long result_found;
+  int &stop;
+  unsigned short seed[3];
+  hash_list<T> *hl;
 
-    list->lk.acquire();
+  thread_param(int n_buckets, int nb_threads, int update, int range,
+               int &stop, hash_list<T> *hl)
+    :n_buckets(n_buckets), nb_threads(nb_threads), update(update),
+     range(range), variation(0), result_add(0), result_remove(0),
+     result_contains(0), result_found(0), stop(stop), hl(hl) {
+    rand_init(seed);
+  }
 
-    if(list->head == NULL)
+  NEW_DELETE_OPS(thread_param<T>);
+};
+template <typename T>
+void test(void *param) {}
+
+template <typename T>
+void bench_init(void) {}
+
+template <typename T>
+void bench_finish(void) {}
+
+//////////////////////////////////////
+// SPINLOCK START
+/////////////////////////////////////
+template <>
+class list<spinlock> {
+  node *head_;
+  spinlock lk_;
+public:
+  list(void) : head_(new node(0)), lk_("spin bench") {}
+  ~list(void) {
+    for (auto iter = head_; iter != NULL;)
     {
-        new_node = (node_t*)kmalloc(sizeof(node_t), "node");
-        new_node->next = NULL;
-        new_node->value = key;
-        list->head = new_node;
-
-        list->lk.release();
-        return ret;
+      auto trash = iter;
+      iter = iter->next;
+      delete trash;
     }
+  }
 
-    prev = list->head;
-    cur = prev->next;
-    for (; cur != NULL; prev = cur, cur = cur->next)
-    {
-        if (cur->value == key)
-        {
-            ret = 0;
-            break;
-        }
-    }
-
-    if(ret){
-        //no node with key value
-        new_node = (node_t*)kmalloc(sizeof(node_t), "node");
-        new_node->next = NULL;
-        new_node->value = key;
-        prev->next = new_node;
-    }
-
-    list->lk.release();
-
-    return ret;
-}
-
-int list_delete(int key, list_t *list)
-{
-    node_t *prev, *cur;
+  int list_insert(int key) {
+    node *prev, *cur;
     int ret = 0;
-    list->lk.acquire();
 
-    if(list->head == NULL){
-        list->lk.release();
-        return ret;
-    }
-    else{
-        prev = list->head;
-        cur = prev->next;
-        for(; cur!=NULL; prev=cur, cur=cur->next)
-        {
-            if(cur->value == key){
-                ret = 1;
-                break;
-            }
-        }
-    }
-
-    if(ret)
-    {
-        //node to delete with key value
-        prev->next = cur->next;
-        kmfree((void*)cur, sizeof(node_t));
-        // cprintf( "delete node value : %d\tpid : %d\n", key, getpid());
-    }
-    else{
-        // cprintf( "nothing to delete %d\t pid : %d\n", key, getpid());
-    }
-    list->lk.release();
-
-    return ret;
-}
-
-int list_find(int key, list_t *list)
-{
-    node_t *node = list->head;
-    int ret = 0, val = 0;
-
-    list->lk.acquire();
-    for (; node != NULL; node = node->next)
-    {
-        if ((val = node->value) == key)
-        {
-            ret = (val == key);
+    scoped_acquire l(&lk_);
+    for (prev = head_, cur = prev->next; ; prev = cur, cur = cur->next)
+      {
+        if (cur == NULL || cur->value > key)
+          {
+            auto new_node = new node(key);
+            new_node->next = prev->next;
+            prev->next = new_node;
+            ret = 1;            // successed
             break;
-        }
-    }
-    list->lk.release();
-
+          }
+        else if (cur->value == key)
+          break;                // the key value already exists.
+      }
     return ret;
-}
+  }
 
-void test(void* param)
-{
-    int op, bucket, value;
-    value = 1;
-    cprintf("thread %d Start\n", myproc()->pid);
+  int list_delete(int key) {
+    node *prev, *cur;
+    int ret = 0;
 
+    scoped_acquire l(&lk_);
+    for (prev = head_, cur = prev->next; cur != NULL; prev = cur, cur = prev->next)
+      {
+        // found the target to be deleted
+        if (cur->value == key)
+          {
+            prev->next = cur->next;
+            delete cur;
+            ret = 1;
+            break;
+          }
+      }
+    return ret;
+  }
 
-    thread_param_t *p_data = (thread_param_t*)param; 
-    hash_list_t *p_hash_list = p_data->p_hash_list;
+  int list_find(int key) {
+    node *cur;
+    int value = -1;
 
-    while (*p_data->stop == 0)
+    scoped_acquire l(&lk_);
+    cur = head_;
+    while (cur && cur->value < key)
+      cur = cur->next;
+
+    // found the value
+    if (cur && cur->value == key)
+      value = cur->value;
+
+    return value;
+  }
+
+  int raw_insert(int key) {
+    node *prev, *cur;
+    int ret = 0;
+
+    for (prev = head_, cur = prev->next; cur != NULL;
+         prev = cur, cur = cur->next)
+      {
+        if (key < cur->value)
+          {
+            ret = 1;
+            auto new_node = new node(key);
+            new_node->next = cur;
+            prev->next = new_node;
+            return ret;
+          }
+        else if(key == cur->value)
+          return ret;               // already exists
+      }
+
+    if (cur == NULL)
+      {
+        ret = 1;
+        auto new_node = new node(key);
+        new_node->next = cur;
+        prev->next = new_node;
+      }
+    return ret;
+  }
+
+  int get_total_node_number(void) {
+    int total_num = 0;
+    for (auto iter = head_->next; iter != NULL; iter = iter->next)
     {
-        op = randomrange(1, 1000);
-        value = randomrange(1, p_data->range);
-        bucket = HASH_VALUE(p_hash_list, value);
-        list_t *p_list = p_hash_list->buckets[bucket];
-        if (op < p_data->update)
+      total_num++;
+    }
+    return total_num;
+  }
+
+  NEW_DELETE_OPS(list<spinlock>);
+};
+
+template <>
+void test<spinlock>(void *param) {
+  int op, bucket, value;
+  auto *p_data = reinterpret_cast<thread_param<spinlock> *>(param);
+  auto &hash_list = *p_data->hl;
+
+  cprintf("thread %d Start\n", myproc()->pid);
+  // need condition for barrier
+  while (p_data->stop == 0)
+    {
+      op = rand_range(1000, p_data->seed);
+      value = rand_range(p_data->range, p_data->seed);
+      bucket = value % p_data->n_buckets;
+      auto *p_list = hash_list.get_list(bucket);
+
+      if (op < p_data->update)
         {
-            if ((op & 0x01) == 0)
+          if ((op & 0x01) == 0)
             {
-                if (list_insert(value, p_list))
+              if (p_list->list_insert(value))
                 {
-                    p_data->variation++;
+                  p_data->variation++;
                 }
-                p_data->result_add++;
+              p_data->result_add++;
             }
-            else
+          else
             {
-                if (list_delete(value, p_list))
+              if (p_list->list_delete(value))
                 {
-                    p_data->variation--;
+                  p_data->variation--;
                 }
-                p_data->result_remove++;
+              p_data->result_remove++;
             }
         }
-        else
+      else
         {
-            if(list_find(value, p_list))
+          if(p_list->list_find(value) >= 0)
             {
-                p_data->result_contains++;
+              p_data->result_contains++;
             }
-            p_data->result_found++;
+          p_data->result_found++;
         }
     }
+  cprintf("thread %d end\n", myproc()->pid);
+}
+//////////////////////////////////////
+// SPINLOCK END
+/////////////////////////////////////
+//////////////////////////////////////
+// MVRLU START
+/////////////////////////////////////
+struct mvrlu_bench {};
+struct mvrlu_node {
+  int value;
+  mvrlu_node *next;
+
+  mvrlu_node(int val): value(val), next(NULL) {}
+
+  static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
+    return mvrlu::mvrlu_alloc<mvrlu_node>();
+  }
+
+  static void* operator new(unsigned long nbytes) {
+    void *p = mvrlu_node::operator new(nbytes, std::nothrow);
+    if (p == nullptr)
+      throw_bad_alloc();
+    return p;
+  }
+
+  static void operator delete(void *p, const std::nothrow_t&) noexcept {
+    mvrlu::mvrlu_free(p);
+  }
+
+  static void operator delete(void *p) {
+    mvrlu_node::operator delete(p, std::nothrow);
+  }
+
+};
+// mvrlu::thread_handle<node> h;
+
+template <>
+class list<mvrlu_bench> {
+  mvrlu_node *head_;
+public:
+  list(void):head_(new mvrlu_node(0)) {}
+  ~list(void) {
+    for (auto iter = head_; iter != NULL; )
+    {
+      auto trash = iter;
+      iter = iter->next;
+      delete trash;
+    }
+  }
+
+  int list_insert(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+    mvrlu_node *prev, *cur;
+    int ret = 0;
+
+  restart:
+    h.mvrlu_reader_lock();
+    for (prev = h.mvrlu_deref(head_), cur = h.mvrlu_deref(prev->next); ;
+         prev = cur, cur = h.mvrlu_deref(cur->next))
+    {
+      if (cur == NULL || cur->value > key)
+      {
+        if (!h.mvrlu_try_lock(&prev))
+        {
+          h.mvrlu_abort();
+          goto restart;
+        }
+        auto new_node = new mvrlu_node(key);
+        mvrlu::mvrlu_assign_pointer(&new_node->next, prev->next);
+        mvrlu::mvrlu_assign_pointer(&prev->next, new_node);
+        ret = 1;
+        break;
+      }
+      else if (cur->value == key)
+        break;
+    }
+    h.mvrlu_reader_unlock();
+    return ret;
+  }
+
+  int list_delete(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+    mvrlu_node *prev, *cur;
+    int ret = 0;
+
+  restart:
+    h.mvrlu_reader_lock();
+    for (prev = h.mvrlu_deref(head_), cur = h.mvrlu_deref(prev->next); cur != NULL;
+         prev = cur, cur = h.mvrlu_deref(cur->next))
+    {
+      if (cur->value == key)
+      {
+        if (!h.mvrlu_try_lock(&prev) ||
+            !h.mvrlu_try_lock_const(cur))
+        {
+          h.mvrlu_abort();
+          goto restart;
+        }
+        auto *cur_n = h.mvrlu_deref(cur->next);
+        mvrlu::mvrlu_assign_pointer(&prev->next, cur_n);
+        h.mvrlu_free(cur);
+        ret = 1;
+        break;
+      }
+    }
+    h.mvrlu_reader_unlock();
+    return ret;
+  }
+
+  int list_find(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+    int value = -1;
+
+    h.mvrlu_reader_lock();
+    auto *cur = h.mvrlu_deref(head_);
+
+    while (cur && cur->value < key)
+      cur = h.mvrlu_deref(cur->next);
+
+    if (cur && cur->value == key)
+      value = cur->value;
+
+    h.mvrlu_reader_unlock();
+    return value;
+  }
+
+  int raw_insert(int key) {
+    mvrlu_node *prev, *cur;
+    int ret = 0;
+
+    for (prev = head_, cur = prev->next; cur != NULL;
+         prev = cur, cur = cur->next)
+      {
+        if (key < cur->value)
+          {
+            ret = 1;
+            auto new_node = new mvrlu_node(key);
+            new_node->next = cur;
+            prev->next = new_node;
+            return ret;
+          }
+        else if(key == cur->value)
+          return ret;               // already exists
+      }
+
+    if (cur == NULL)
+      {
+        ret = 1;
+        auto new_node = new mvrlu_node(key);
+        new_node->next = cur;
+        prev->next = new_node;
+      }
+    return ret;
+  }
+
+  int get_total_node_number(void) {
+    int total_num = 0;
+    for (auto iter = head_->next; iter != NULL; iter = iter->next)
+      total_num++;
+    return total_num;
+  }
+
+  NEW_DELETE_OPS(list<mvrlu_bench>);
+};
+
+template <>
+void bench_init<mvrlu_bench>(void) {
+  mvrlu_init();
 }
 
+template <>
+void bench_finish<mvrlu_bench>(void) {
+  mvrlu_finish();
+}
 
+template <>
+void test<mvrlu_bench>(void *param) {
+  int op, bucket, value;
+  auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
+  auto &hash_list = *p_data->hl;
+  auto *handle = new mvrlu::thread_handle<mvrlu_node>();
+
+  cprintf("thread %d Start\n", myproc()->pid);
+  // need condition for barrier
+  while (p_data->stop == 0)
+    {
+      op = rand_range(1000, p_data->seed);
+      value = rand_range(p_data->range, p_data->seed);
+      bucket = value % p_data->n_buckets;
+      auto *p_list = hash_list.get_list(bucket);
+
+      if (op < p_data->update)
+        {
+          if ((op & 0x01) == 0)
+            {
+              if (p_list->list_insert(*handle, value))
+                {
+                  p_data->variation++;
+                }
+              p_data->result_add++;
+            }
+          else
+            {
+              if (p_list->list_delete(*handle, value))
+                {
+                  p_data->variation--;
+                }
+              p_data->result_remove++;
+            }
+        }
+      else
+        {
+          if(p_list->list_find(*handle, value) >= 0)
+            {
+              p_data->result_contains++;
+            }
+          p_data->result_found++;
+        }
+    }
+  delete handle;
+  cprintf("thread %d end\n", myproc()->pid);
+}
+
+void sleep_usec(u64 initial_time, u64 usec);
+
+template <typename T>
+void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration);
+
+template <typename T>
+void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range)
+{
+  bench_init<T>();
+
+  hash_list<T> *hl = new hash_list<T>(n_buckets);
+
+  cprintf("initialize %d nodes...", initial);
+  int i = 0;
+  unsigned short seed[3];
+
+  rand_init(seed);
+  while (i < initial)
+  {
+    int value = rand_range(range, seed);
+    auto list = hl->get_list(value % n_buckets);
+
+    if (list->raw_insert(value))
+      i++;
+  }
+  cprintf("done\n");
+
+  // allocate pointer list
+  struct proc **thread_list = new struct proc *[nb_threads];
+  thread_param<T> **param_list = new thread_param<T> *[nb_threads];
+
+  // mile sec
+  u64 initial_time = nsectime();
+  cprintf("Main thread ID: %d\n", myproc()->pid);
+  cprintf("Creating %d threads...", nb_threads);
+
+  for (int i = 0; i < nb_threads; i++)
+  {
+    param_list[i] = new thread_param<T>(n_buckets, nb_threads, update,
+                                               range, stop, hl);
+  }
+  for (int i = 0; i < nb_threads; i++)
+  {
+    thread_list[i] = threadpin(test<T>, (void*)param_list[i], "test_thread",
+                               i%(NCPU-1)+1);
+    cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(NCPU-1)+1,
+            thread_list[i]->get_state());
+  }
+  cprintf(" done!\n");
+
+  sleep_usec(initial_time, duration);
+
+  stop = 1;
+  cprintf("join %d threads...\n", nb_threads);
+
+  sleep_usec(nsectime(), 4000); // wait for threads
+
+  bench_finish<T>();
+  cprintf(" done!\n");
+
+  print_outcome<T>(*hl, param_list, nb_threads, initial, duration);
+
+  // deallocate memory
+  delete hl;
+  for (int j = 0; j < nb_threads; j++)
+  {
+    delete param_list[j];
+  }
+  delete[] thread_list;
+  delete[] param_list;
+}
 
 //SYSCALL
 void
-sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
+sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int update,
+              int bench_type)
 {
-    cprintf("Run Kernel Level Benchmark\n");
+  enum bench_type type = (enum bench_type) bench_type;
+  cprintf("Run Kernel Level Benchmark\n");
+  int range = initial * 2;
 
+  assert(n_buckets >= 1);
+  assert(duration >= 0);
+  assert(initial >= 0);
+  assert(nb_threads > 0);
+  assert(update >= 0 && update <= 1000);
+  // assert(range > 0 && range >= initial);
 
-    thread_param_t *param_list;
-    hash_list_t *p_hash_list;
-    struct proc** thread_list;
-    int stop = 0;
-    int initial_time = 0;
-    unsigned long exp = 0, total_variation = 0, total_size = 0;
-    unsigned long reads = 0, updates = 0;
-    unsigned long iv = 0, fv = 0;
+  switch (type) {
+  case SPINLOCK:
+    bench<spinlock>(nb_threads, initial, n_buckets, duration, update, range);
+    cprintf("spinlock\n");
+    break;
+  default:
+    bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
+    cprintf("mvrlu\n");
+    break;
+  }
+  stop = 0;
+  cprintf("Kernel Level Benchmark END\n");
+}
+//////////////////////////////////////
+// NO DEPENDENT CODE
+/////////////////////////////////////
+// initial_time is nano sec
+void sleep_usec(u64 initial_time, u64 usec) {
+  spinlock l("l");
+  condvar cond("sleep cond");
+  u64 until = usec * 1000000 + initial_time;
 
-	int n_buckets = buck;
-	int initial = init;
-	int nb_threads = th;
-	int duration = dur;
-	int update = upd;
-	int range = rng;
+  scoped_acquire local(&l);
+  if (until > nsectime())
+    cond.sleep_to(&l, until);
+}
 
-    assert(n_buckets >= 1);
-    assert(duration >= 0);
-    assert(initial >= 0);
-	assert(nb_threads > 0);
-	assert(update >= 0 && update <= 1000);
-	assert(range > 0 && range >= initial);
+template <typename T>
+void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration) {
+  unsigned long reads = 0, updates = 0, total_variation = 0;
 
-    p_hash_list = (hash_list_t *)kmalloc(sizeof(hash_list_t), "hashlist");
-    if (p_hash_list == NULL) {
-	    cprintf("hash_list init error\n");
-	    return;
-	}
-    p_hash_list->n_buckets = n_buckets;
-
-    for (int i = 0; i < p_hash_list->n_buckets; i++) {
-        list_t *list;
-        list = (list_t *)kmalloc(sizeof(list_t), "lists");
-        if (list == NULL) {
-            cprintf("spinlock_list init error\n");
-            return;
-        }
-        list->head = NULL;
-        // lock_init(&list->lk);
-        list->lk = spinlock("list_lock");
-        p_hash_list->buckets[i] = list;
-    }
-
-    cprintf("initialize %d nodes...", initial);
-    int j = 0;
-    while (j < initial)
+  for (int i = 0; i < nb_threads; i++)
     {
-        int value = randomrange(1, range);
-        int bucket = HASH_VALUE(p_hash_list, value);
-
-        if (list_insert(value, p_hash_list->buckets[bucket]))
-        {
-            j++;
-        }
+      cprintf( "Thread %d\n", i);
+      cprintf( "  #add        : %lu\n", param_list[i]->result_add);
+      cprintf( "  #remove     : %lu\n", param_list[i]->result_remove);
+      cprintf( "  #contains   : %lu\n", param_list[i]->result_contains);
+      cprintf( "  #found      : %lu\n", param_list[i]->result_found);
+      reads += param_list[i]->result_found;
+      updates += (param_list[i]->result_add + param_list[i]->result_remove);
+      total_variation += param_list[i]->variation;
     }
-    cprintf("done\n");
+  unsigned long total_size = 0;
+  for (int i = 0; i < param_list[0]->n_buckets; i++)
+    total_size += hl.get_list(i)->get_total_node_number();
 
-    thread_list = (struct proc**)kmalloc(nb_threads*sizeof(struct proc*), "threads");
-    if (thread_list == NULL) {
-        cprintf("thread_list init error\n");
-        return;
-    }
+  unsigned long exp = initial + total_variation;
+  cprintf( "\n#### B ####\n");
 
-    param_list = (thread_param_t *)kmalloc(nb_threads*sizeof(thread_param_t), "params");
-    if (param_list == NULL) {
-        cprintf("param_list init error\n");
-        return;
-    }
-   
-    initial_time = (int)(nsectime() / 1000000);
-    cprintf("Main thread ID: %d\n", myproc()->pid);
-    cprintf("Creating %d threads...", nb_threads);
-    for(int i = 0; i < nb_threads; i++)
-    {
-        param_list[i].n_buckets = n_buckets;
-        param_list[i].initial = initial;
-        param_list[i].nb_threads = nb_threads;
-        param_list[i].update = update;
-        param_list[i].range = range;
-        param_list[i].stop = &stop;
-        param_list[i].variation = 0;
-        param_list[i].p_hash_list = p_hash_list;
+  cprintf( "Set size      : %lu (expected: %lu)\n", total_size, exp);
+  cprintf( "Duration      : %d (ms)\n", duration);
+  unsigned long iv = reads * 1000.0 / duration;
+  unsigned long fv = (unsigned long)(reads * 1000.0 / duration * 10) % 10;
+  cprintf( "#read ops     : %lu (%lu.%lu / s)\n", reads, iv, fv);
+  iv = updates * 1000.0 / duration;
+  fv = (unsigned long)(updates * 1000.0 / duration * 10) % 10;
+  cprintf( "#update ops   : %lu (%lu.%lu / s)\n", updates, iv, fv);
 
-        thread_list[i] = threadpin(test, (void*)&param_list[i], "test_thread", i%(ncpu-1)+1);
-        cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(ncpu-1)+1, thread_list[i]->get_state());
-    }
-    cprintf(" done!\n");
-
-    while(1)
-    {
-        if((nsectime() / 1000000) - initial_time > duration)
-        {
-            stop = 1;
-            cprintf( "elapsed time: %dms\n", (int)((nsectime() / 1000000) - initial_time));
-            break;
-        }
-    }
-
-    cprintf("join %d threads...\n", nb_threads);
-    for(int i = 0; i < nb_threads; i++)
-    {
-        wait(-1, NULL);
-    }
-    cprintf(" done!\n");
-
-    cprintf( "\n####result####\n");
-	for (int i = 0; i < nb_threads; i++) {
-		cprintf( "Thread %d\n", i);
-		cprintf( "  #add        : %d\n", param_list[i].result_add);
-		cprintf( "  #remove     : %d\n", param_list[i].result_remove);
-		cprintf( "  #contains   : %d\n", param_list[i].result_contains);
-		cprintf( "  #found      : %d\n", param_list[i].result_found);
-		reads += param_list[i].result_found;
-		updates += (param_list[i].result_add + param_list[i].result_remove);
-		total_variation += param_list[i].variation;
-	}
-
-    for(int i = 0; i < n_buckets; i++)
-    {
-        node_t *node = p_hash_list->buckets[i]->head;
-        node_t *prev;
-        while(node != NULL)
-        {
-            prev = node;
-            node = node->next;
-            kmfree((void*)prev, sizeof(node_t));
-            total_size++;
-        }
-
-        list_t *list = p_hash_list->buckets[i];
-        kmfree((void*)list, sizeof(list_t));
-    }
-    kmfree((void*)p_hash_list, sizeof(hash_list_t));
-    kmfree((void*)thread_list, nb_threads*sizeof(struct proc*));
-    kmfree((void*)param_list, nb_threads*sizeof(thread_param_t));
-
-    exp = initial + total_variation;
-    cprintf( "\n#### B ####\n");
-
-    cprintf( "Set size      : %d (expected: %d)\n", (int)total_size, (int)exp);
-    cprintf( "Duration      : %d (ms)\n", (int)duration);
-    iv = (reads + updates) * 1000.0 / duration;
-    fv = (int)((reads + updates) * 1000.0 / duration * 10) % 10;
-    cprintf( "#ops          : %d (%d.%d / s)\n", (int)(reads + updates), (int)iv, (int)fv);
-    iv = reads * 1000.0 / duration;
-    fv = (int)(reads * 1000.0 / duration * 10) % 10;
-    cprintf( "#read ops     : %d (%d.%d / s)\n", (int)reads, (int)iv, (int)fv);
-    iv = updates * 1000.0 / duration;
-    fv = (int)(updates * 1000.0 / duration * 10) % 10;
-    cprintf( "#update ops   : %d (%d.%d / s)\n", (int)updates, (int)iv, (int)fv);
-
-    if(exp != total_size)
-    {
-		cprintf("\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", (int)exp, (int)total_size);
-    }
-
-
-
-    cprintf("Kernel Level Benchmark END\n");
+  if(exp != total_size)
+  {
+    cprintf("\n<<<<<< ASSERT FAILURE(%lu!=%lu) <<<<<<<<\n", exp, total_size);
+  }
 }
