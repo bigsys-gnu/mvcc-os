@@ -12,6 +12,7 @@
 #include "apic.hh"
 #include "codex.hh"
 #include "mfs.hh"
+#include "mvrlu/mvrlu.h"
 
 void initpic(void);
 void initextpic(void);
@@ -274,6 +275,8 @@ cmain(u64 mbmagic, u64 mbaddr)
 #if DEBUG
   cprintf("Running in DEBUG mode\n");
 #endif
+
+  // mvrlu_init();
 
   idleloop();
 

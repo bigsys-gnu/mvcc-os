@@ -12,6 +12,7 @@
 #include "benchcodex.hh"
 #include "cpuid.hh"
 #include "ilist.hh"
+#include "mvrlu/mvrlu.h"
 
 struct idle {
   struct proc *cur;
@@ -84,6 +85,7 @@ idleloop(void)
         asm volatile("hlt");
     }
   }
+  // mvrlu_finish();
 }
 
 void

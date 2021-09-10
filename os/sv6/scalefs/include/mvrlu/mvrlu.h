@@ -5,13 +5,13 @@
 extern "C" {
 #endif
 
-#ifndef __KERNEL__
 #include <stddef.h>
+#ifndef __KERNEL__
 #include <stdint.h>
 #include <limits.h>
 #else
-#include <linux/compiler.h>
-#include <linux/sched.h>
+#include "compiler.h"
+/* #include <linux/sched.h> */
 #endif /* __KERNEL__ */
 
 /*
@@ -50,91 +50,93 @@ void *mvrlu_deref(mvrlu_thread_struct_t *self, void *p_obj);
 
 void mvrlu_flush_log(mvrlu_thread_struct_t *self);
 
+#ifndef __cplusplus
 #define mvrlu_try_lock(self, p_p_obj)                                          \
 	_mvrlu_try_lock(self, (void **)p_p_obj, sizeof(**p_p_obj))
 #define mvrlu_try_lock_const(self, obj)                                        \
 	_mvrlu_try_lock_const(self, obj, sizeof(*obj))
 #define mvrlu_assign_ptr(self, p_ptr, p_obj)                                   \
 	_mvrlu_assign_pointer((void **)p_ptr, p_obj)
+#endif
 
 /*
  * MV-RLU API for kernel
  */
-#ifdef __KERNEL__
-static inline void kmvrlu_print_stats(void)
-{
-	return mvrlu_print_stats();
-}
+/* #ifdef __KERNEL__ */
+/* static inline void kmvrlu_print_stats(void) */
+/* { */
+/* 	return mvrlu_print_stats(); */
+/* } */
 
-static inline mvrlu_thread_struct_t *kmvrlu_thread_alloc(void)
-{
-	return mvrlu_thread_alloc();
-}
+/* static inline mvrlu_thread_struct_t *kmvrlu_thread_alloc(void) */
+/* { */
+/* 	return mvrlu_thread_alloc(); */
+/* } */
 
-static inline void kmvrlu_thread_free(void)
-{
-	mvrlu_thread_free(current->mvrlu_self);
-}
+/* static inline void kmvrlu_thread_free(void) */
+/* { */
+/* 	mvrlu_thread_free(current->mvrlu_self); */
+/* } */
 
-static inline void kmvrlu_thread_init(void)
-{
-	mvrlu_thread_init(current->mvrlu_self);
-}
+/* static inline void kmvrlu_thread_init(void) */
+/* { */
+/* 	mvrlu_thread_init(current->mvrlu_self); */
+/* } */
 
-static inline void kmvrlu_thread_finish(void)
-{
-	mvrlu_thread_finish(current->mvrlu_self);
-}
+/* static inline void kmvrlu_thread_finish(void) */
+/* { */
+/* 	mvrlu_thread_finish(current->mvrlu_self); */
+/* } */
 
-static inline void *kmvrlu_alloc(size_t size)
-{
-	return mvrlu_alloc(size);
-}
+/* static inline void *kmvrlu_alloc(size_t size) */
+/* { */
+/* 	return mvrlu_alloc(size); */
+/* } */
 
-static inline void kmvrlu_free(void *p_obj)
-{
-	return mvrlu_free(current->mvrlu_self, p_obj);
-}
+/* static inline void kmvrlu_free(void *p_obj) */
+/* { */
+/* 	return mvrlu_free(current->mvrlu_self, p_obj); */
+/* } */
 
-static inline void kmvrlu_reader_lock(void)
-{
-	return mvrlu_reader_lock(current->mvrlu_self);
-}
+/* static inline void kmvrlu_reader_lock(void) */
+/* { */
+/* 	return mvrlu_reader_lock(current->mvrlu_self); */
+/* } */
 
-static inline void kmvrlu_reader_unlock(void)
-{
-	mvrlu_reader_unlock(current->mvrlu_self);
-}
+/* static inline void kmvrlu_reader_unlock(void) */
+/* { */
+/* 	mvrlu_reader_unlock(current->mvrlu_self); */
+/* } */
 
-static inline void kmvrlu_abort(void)
-{
-	mvrlu_abort(current->mvrlu_self);
-}
+/* static inline void kmvrlu_abort(void) */
+/* { */
+/* 	mvrlu_abort(current->mvrlu_self); */
+/* } */
 
-static inline int kmvrlu_cmp_ptrs(void *p_obj_1, void *p_obj_2)
-{
-	return mvrlu_cmp_ptrs(p_obj_1, p_obj_2);
-}
+/* static inline int kmvrlu_cmp_ptrs(void *p_obj_1, void *p_obj_2) */
+/* { */
+/* 	return mvrlu_cmp_ptrs(p_obj_1, p_obj_2); */
+/* } */
 
-static inline void *kmvrlu_deref(void *p_obj)
-{
-	return mvrlu_deref(current->mvrlu_self, p_obj);
-}
+/* static inline void *kmvrlu_deref(void *p_obj) */
+/* { */
+/* 	return mvrlu_deref(current->mvrlu_self, p_obj); */
+/* } */
 
-static inline void kmvrlu_flush_log(void)
-{
-	mvrlu_flush_log(current->mvrlu_self);
-}
+/* static inline void kmvrlu_flush_log(void) */
+/* { */
+/* 	mvrlu_flush_log(current->mvrlu_self); */
+/* } */
 
-#define kmvrlu_try_lock(p_p_obj)                                               \
-	_mvrlu_try_lock(current->mvrlu_self, (void **)p_p_obj,                 \
-			sizeof(**p_p_obj))
-#define kmvrlu_try_lock_const(obj)                                             \
-	_mvrlu_try_lock_const(current->mvrlu_self, obj, sizeof(*obj))
-#define kmvrlu_assign_ptr(p_ptr, p_obj)                                        \
-	_mvrlu_assign_pointer((void **)p_ptr, p_obj)
+/* #define kmvrlu_try_lock(p_p_obj)                                               \ */
+/* 	_mvrlu_try_lock(current->mvrlu_self, (void **)p_p_obj,                 \ */
+/* 			sizeof(**p_p_obj)) */
+/* #define kmvrlu_try_lock_const(obj)                                             \ */
+/* 	_mvrlu_try_lock_const(current->mvrlu_self, obj, sizeof(*obj)) */
+/* #define kmvrlu_assign_ptr(p_ptr, p_obj)                                        \ */
+/* 	_mvrlu_assign_pointer((void **)p_ptr, p_obj) */
 
-#endif /* __KERNEL__ */
+/* #endif /\* __KERNEL__ *\/ */
 
 /*
  * Compatibility wrapper for RLU
