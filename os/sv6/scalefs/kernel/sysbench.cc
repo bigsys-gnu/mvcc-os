@@ -16,10 +16,11 @@
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
-#define MAX_BUCKETS (128)
-#define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
-#define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
+//#define MAX_BUCKETS                     (1024)
+//#define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
+//*** #define HASH_VALUE(p_hash_list, val)    (val % p_hash_list->nbuckets)
 
+/**** 
 typedef struct node {
     int value;
     struct node *next;
@@ -34,6 +35,7 @@ typedef struct hash_list {
 	int n_buckets;
 	list_t *buckets[MAX_BUCKETS];  
 } hash_list_t;
+*/
 
 typedef struct thread_param {
 	int n_buckets;
@@ -47,7 +49,8 @@ typedef struct thread_param {
     int result_contains;
     int result_found;
     int *stop;
-    hash_list_t *p_hash_list;
+    //*** hash_list_t *p_hash_list;
+    chainhash<u64, u64> *p_hash_list;
 } thread_param_t;
 
 uint64_t
@@ -70,8 +73,7 @@ int randomrange(int lo, int hi)
   return u_rand() % (range) + lo;
 }
 
-
-
+/****
 int list_insert(int key, list_t *list)
 {
     node_t *prev = NULL, *cur = NULL, *new_node = NULL;
@@ -169,28 +171,32 @@ int list_find(int key, list_t *list)
 
     return ret;
 }
+*/
 
 void test(void* param)
 {
-    int op, bucket, value;
+    int op;
+    u64 value;
     value = 1;
     cprintf("thread %d Start\n", myproc()->pid);
 
 
     thread_param_t *p_data = (thread_param_t*)param; 
-    hash_list_t *p_hash_list = p_data->p_hash_list;
+    //*** hash_list_t *p_hash_list = p_data->p_hash_list;
+    chainhash<u64, u64> *p_hash_list = p_data->p_hash_list;
 
     while (*p_data->stop == 0)
     {
         op = randomrange(1, 1000);
         value = randomrange(1, p_data->range);
-        bucket = HASH_VALUE(p_hash_list, value);
-        list_t *p_list = p_hash_list->buckets[bucket];
+        //*** bucket = HASH_VALUE(p_hash_list, value);
+        //*** list_t *p_list = p_hash_list->buckets[bucket];
         if (op < p_data->update)
         {
             if ((op & 0x01) == 0)
             {
-                if (list_insert(value, p_list))
+                //*** if (list_insert(value, p_list))
+                if(p_hash_list->insert(value, value))
                 {
                     p_data->variation++;
                 }
@@ -198,7 +204,8 @@ void test(void* param)
             }
             else
             {
-                if (list_delete(value, p_list))
+                //*** if (list_delete(value, p_list))
+                if(p_hash_list->remove(value, value))
                 {
                     p_data->variation--;
                 }
@@ -207,7 +214,8 @@ void test(void* param)
         }
         else
         {
-            if(list_find(value, p_list))
+            //*** if(list_find(value, p_list))
+            if(p_hash_list->lookup(value, &value))
             {
                 p_data->result_contains++;
             }
@@ -222,11 +230,11 @@ void test(void* param)
 void
 sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 {
-    cprintf("Run Kernel Level Benchmark\n");
-
+    cprintf("Run Kernel Level Benchmark\n");    
 
     thread_param_t *param_list;
-    hash_list_t *p_hash_list;
+    //hash_list_t *p_hash_list;
+    chainhash<u64, u64> *p_hash_list = NULL;
     struct proc** thread_list;
     int stop = 0;
     int initial_time = 0;
@@ -234,9 +242,9 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
     unsigned long reads = 0, updates = 0;
     unsigned long iv = 0, fv = 0;
 
-	int n_buckets = buck;
-	int initial = init;
 	int nb_threads = th;
+    int initial = init;
+    int n_buckets = buck;
 	int duration = dur;
 	int update = upd;
 	int range = rng;
@@ -248,16 +256,19 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 	assert(update >= 0 && update <= 1000);
 	assert(range > 0 && range >= initial);
 
-    p_hash_list = (hash_list_t *)kmalloc(sizeof(hash_list_t), "hashlist");
+    //*** p_hash_list = (hash_list_t *)kmalloc(sizeof(hash_list_t), "hashlist");
+    p_hash_list = new chainhash<u64, u64>(n_buckets);    
     if (p_hash_list == NULL) {
 	    cprintf("hash_list init error\n");
 	    return;
 	}
-    p_hash_list->n_buckets = n_buckets;
+    //*** p_hash_list->n_buckets = n_buckets;    
 
-    for (int i = 0; i < p_hash_list->n_buckets; i++) {
+    /* init hashlist
+        for (int i = 0; i < p_hash_list->n_buckets; i++) {    
         list_t *list;
         list = (list_t *)kmalloc(sizeof(list_t), "lists");
+
         if (list == NULL) {
             cprintf("spinlock_list init error\n");
             return;
@@ -267,20 +278,21 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
         list->lk = spinlock("list_lock");
         p_hash_list->buckets[i] = list;
     }
+    */
 
     cprintf("initialize %d nodes...", initial);
     int j = 0;
     while (j < initial)
     {
-        int value = randomrange(1, range);
-        int bucket = HASH_VALUE(p_hash_list, value);
+        int value = randomrange(1, range);        
 
-        if (list_insert(value, p_hash_list->buckets[bucket]))
+        if (p_hash_list->insert(value, value))
         {
             j++;
         }
     }
     cprintf("done\n");
+    
 
     thread_list = (struct proc**)kmalloc(nb_threads*sizeof(struct proc*), "threads");
     if (thread_list == NULL) {
@@ -342,6 +354,7 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
 		total_variation += param_list[i].variation;
 	}
 
+    /***
     for(int i = 0; i < n_buckets; i++)
     {
         node_t *node = p_hash_list->buckets[i]->head;
@@ -357,31 +370,32 @@ sys_benchmark(int th, int init, int buck, int dur, int upd, int rng)
         list_t *list = p_hash_list->buckets[i];
         kmfree((void*)list, sizeof(list_t));
     }
+    
     kmfree((void*)p_hash_list, sizeof(hash_list_t));
+    */
+    total_size = p_hash_list->getSize();
     kmfree((void*)thread_list, nb_threads*sizeof(struct proc*));
     kmfree((void*)param_list, nb_threads*sizeof(thread_param_t));
 
     exp = initial + total_variation;
     cprintf( "\n#### B ####\n");
 
-    cprintf( "Set size      : %d (expected: %d)\n", (int)total_size, (int)exp);
-    cprintf( "Duration      : %d (ms)\n", (int)duration);
-    iv = (reads + updates) * 1000.0 / duration;
-    fv = (int)((reads + updates) * 1000.0 / duration * 10) % 10;
-    cprintf( "#ops          : %d (%d.%d / s)\n", (int)(reads + updates), (int)iv, (int)fv);
-    iv = reads * 1000.0 / duration;
-    fv = (int)(reads * 1000.0 / duration * 10) % 10;
-    cprintf( "#read ops     : %d (%d.%d / s)\n", (int)reads, (int)iv, (int)fv);
-    iv = updates * 1000.0 / duration;
-    fv = (int)(updates * 1000.0 / duration * 10) % 10;
-    cprintf( "#update ops   : %d (%d.%d / s)\n", (int)updates, (int)iv, (int)fv);
+    cprintf( "Set size      : %ld [b:%d]  (expected: %ld [b:%d])\n", exp, n_buckets, total_size, p_hash_list->getBucketSize());
+    cprintf( "Duration      : %d (ms)\n", duration);
+    iv = (unsigned long)((reads + updates) * 1000.0 / duration);
+    fv = (unsigned long)((reads + updates) * 1000.0 / duration * 10) % 10;
+    cprintf( "#ops          : %ld (%ld.%ld / s)\n", reads + updates, iv, fv);
+    iv = (unsigned long)(reads * 1000.0 / duration);
+    fv = (unsigned long)(reads * 1000.0 / duration * 10) % 10;
+    cprintf( "#read ops     : %ld (%ld.%ld / s)\n", reads, iv, fv);
+    iv = (unsigned long)(updates * 1000.0 / duration);
+    fv = (unsigned long)(updates * 1000.0 / duration * 10) % 10;
+    cprintf( "#update ops   : %ld (%ld.%ld / s)\n", updates, iv, fv);
 
     if(exp != total_size)
     {
-		cprintf("\n<<<<<< ASSERT FAILURE(%d!=%d) <<<<<<<<\n", (int)exp, (int)total_size);
+		cprintf("\n<<<<<< ASSERT FAILURE(%ld!=%ld) <<<<<<<<\n", exp, total_size);
     }
-
-
 
     cprintf("Kernel Level Benchmark END\n");
 }

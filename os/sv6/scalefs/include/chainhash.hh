@@ -22,21 +22,21 @@ private:
     void do_gc() override { delete this; }
     NEW_DELETE_OPS(item);
 
-    islink<item> link;
-    seqcount<u32> seq;
+    islink<item> link;  //ilist.hh -> singly-linked lists
+    seqcount<u32> seq;  //seqlock.hh -> a synchronization primitive
     const K key;
     V val;
   };
 
   struct bucket {
     spinlock lock __mpalign__;
-    islist<item, &item::link> chain;
+    islist<item, &item::link> chain; //ilist.hh -> intrusive singly-linked list
 
     ~bucket() {
       while (!chain.empty()) {
         item *i = &chain.front();
         chain.pop_front();
-        gc_delayed(i);
+        gc_delayed(i);  //gc.hh 
       }
     }
   };
@@ -275,6 +275,28 @@ public:
           return;
       }
     }
+  }
+
+  int getSize() {
+    scoped_gc_epoch rcu_read;
+
+    int size = 0;
+
+    for (u64 i = 0; i < nbuckets_; i++) {
+      bucket* b = &buckets_[i];
+
+      for (const item& i: b->chain) {
+          if (i.key != 0)
+            size++;
+      }
+    }
+
+    return size;
+  }
+
+  int getBucketSize()
+  {
+    return nbuckets_;
   }
 
   bool lookup(const K& k, V* vptr = nullptr) const {
