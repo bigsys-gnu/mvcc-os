@@ -3,6 +3,10 @@
 #include "arch.h"
 #include "config.h"
 #include "debug.h"
+#include "limits.h"
+#ifdef __KERNEL__
+#include "port_data.h"
+#endif
 
 #define MAX_VERSION (ULONG_MAX - 1)
 #define MIN_VERSION (0ul)
