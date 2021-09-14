@@ -12,12 +12,24 @@
 #include "version.hh"
 #include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
+#include "chainhash.hh"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
+template <typename T>
+struct thread_param;
+template <typename T>
+void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range);
+template <typename T>
+struct hash_list;
+template <typename T>
+void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads,
+                   int initial, int duration);
+void sleep_usec(u64 initial_time, u64 usec);
+
 //////////////////////////////////////
 // BENCHMARK TYPES
 /////////////////////////////////////
@@ -307,6 +319,202 @@ void test<spinlock>(void *param) {
 // SPINLOCK END
 /////////////////////////////////////
 //////////////////////////////////////
+// RCU START (RCU + SEQLOCK)
+/////////////////////////////////////
+struct rcu_bench {};
+
+template <>
+unsigned long hash<int>(int const& k) {
+  return (unsigned long)k;
+}
+
+// rcu hash list should not have any dynamic allocated data
+struct rcu_hash_list : public chainhash<int, int> {
+  rcu_hash_list(u64 nbuckets): chainhash<int, int>(nbuckets) {}
+
+  int get_total_node_num(void) {
+    total_node_num_ = 0;
+    enumerate([this](int, int){
+      this->total_node_num_++;
+      return true;
+    });
+    return total_node_num_;
+  }
+private:
+  int total_node_num_;
+};
+
+template <>
+struct thread_param<rcu_bench> {
+  int n_buckets;
+  int nb_threads;
+  int update;
+  int range;
+  unsigned long variation;
+  unsigned long result_add;
+  unsigned long result_remove;
+  unsigned long result_contains;
+  unsigned long result_found;
+  int &stop;
+  unsigned short seed[3];
+  rcu_hash_list &hl;
+
+  thread_param(int n_buckets, int nb_threads, int update, int range,
+               int &stop, rcu_hash_list &hl)
+    :n_buckets(n_buckets), nb_threads(nb_threads), update(update),
+     range(range), variation(0), result_add(0), result_remove(0),
+     result_contains(0), result_found(0), stop(stop), hl(hl) {
+    rand_init(seed);
+  }
+
+  NEW_DELETE_OPS(thread_param<rcu_bench>);
+};
+
+template <>
+void test<rcu_bench>(void *param) {
+  int op, value;
+  auto *p_data = reinterpret_cast<thread_param<rcu_bench> *>(param);
+  auto &hash_list = p_data->hl;
+
+  cprintf("thread %d Start\n", myproc()->pid);
+  // need condition for barrier
+  while (p_data->stop == 0)
+    {
+      op = rand_range(1000, p_data->seed);
+      value = rand_range(p_data->range, p_data->seed);
+
+      if (op < p_data->update)
+        {
+          if ((op & 0x01) == 0)
+            {
+              if (hash_list.insert(value, value))
+                {
+                  p_data->variation++;
+                }
+              p_data->result_add++;
+            }
+          else
+            {
+              if (hash_list.remove(value, value))
+                {
+                  p_data->variation--;
+                }
+              p_data->result_remove++;
+            }
+        }
+      else
+        {
+          if(hash_list.lookup(value))
+            {
+              p_data->result_contains++;
+            }
+          p_data->result_found++;
+        }
+    }
+  cprintf("thread %d end\n", myproc()->pid);
+}
+
+void print_outcome(rcu_hash_list &hl, thread_param<rcu_bench> *param_list[],
+                              int nb_threads, int initial, int duration) {
+  unsigned long reads = 0, updates = 0, total_variation = 0;
+
+  for (int i = 0; i < nb_threads; i++)
+    {
+      cprintf( "Thread %d\n", i);
+      cprintf( "  #add        : %lu\n", param_list[i]->result_add);
+      cprintf( "  #remove     : %lu\n", param_list[i]->result_remove);
+      cprintf( "  #contains   : %lu\n", param_list[i]->result_contains);
+      cprintf( "  #found      : %lu\n", param_list[i]->result_found);
+      reads += param_list[i]->result_found;
+      updates += (param_list[i]->result_add + param_list[i]->result_remove);
+      total_variation += param_list[i]->variation;
+    }
+  unsigned long total_size = 0;
+  total_size = hl.get_total_node_num();
+
+  unsigned long exp = initial + total_variation;
+  cprintf( "\n#### B ####\n");
+
+  cprintf( "Set size      : %lu (expected: %lu)\n", total_size, exp);
+  cprintf( "Duration      : %d (ms)\n", duration);
+  unsigned long iv = reads * 1000.0 / duration;
+  unsigned long fv = (unsigned long)(reads * 1000.0 / duration * 10) % 10;
+  cprintf( "#read ops     : %lu (%lu.%lu / s)\n", reads, iv, fv);
+  iv = updates * 1000.0 / duration;
+  fv = (unsigned long)(updates * 1000.0 / duration * 10) % 10;
+  cprintf( "#update ops   : %lu (%lu.%lu / s)\n", updates, iv, fv);
+
+  if(exp != total_size)
+  {
+    cprintf("\n<<<<<< ASSERT FAILURE(%lu!=%lu) <<<<<<<<\n", exp, total_size);
+  }
+}
+
+template <>
+void bench<rcu_bench>(int nb_threads, int initial, int n_buckets, int duration, int update,
+                      int range) {
+  auto *hl = new rcu_hash_list(n_buckets);
+
+  cprintf("initialize %d nodes...", initial);
+  int i = 0;
+  unsigned short seed[3];
+
+  rand_init(seed);
+  while (i < initial)
+  {
+    int value = rand_range(range, seed);
+    if (hl->insert(value, value))
+      i++;
+  }
+  cprintf("done\n");
+
+  // allocate pointer list
+  struct proc **thread_list = new struct proc *[nb_threads];
+  thread_param<rcu_bench> **param_list = new thread_param<rcu_bench> *[nb_threads];
+
+  // mile sec
+  u64 initial_time = nsectime();
+  cprintf("Main thread ID: %d\n", myproc()->pid);
+  cprintf("Creating %d threads...", nb_threads);
+
+  for (int i = 0; i < nb_threads; i++)
+  {
+    param_list[i] = new thread_param<rcu_bench>(n_buckets, nb_threads, update,
+                                                range, stop, *hl);
+  }
+  for (int i = 0; i < nb_threads; i++)
+  {
+    thread_list[i] = threadpin(test<rcu_bench>, (void*)param_list[i], "test_thread",
+                               i%(NCPU-1)+1);
+    cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(NCPU-1)+1,
+            thread_list[i]->get_state());
+  }
+  cprintf(" done!\n");
+
+  sleep_usec(initial_time, duration);
+
+  stop = 1;
+  cprintf("join %d threads...\n", nb_threads);
+
+  sleep_usec(nsectime(), 4000); // wait for threads
+
+  cprintf(" done!\n");
+
+  print_outcome(*hl, param_list, nb_threads, initial, duration);
+
+  // deallocate memory
+  delete hl;
+  for (int j = 0; j < nb_threads; j++)
+  {
+    delete param_list[j];
+  }
+  delete[] thread_list;
+  delete[] param_list;
+}
+//////////////////////////////////////
+// RCU END
+/////////////////////////////////////
+//////////////////////////////////////
 // MVRLU START
 /////////////////////////////////////
 struct mvrlu_bench {};
@@ -521,11 +729,6 @@ void test<mvrlu_bench>(void *param) {
   delete handle;
   cprintf("thread %d end\n", myproc()->pid);
 }
-
-void sleep_usec(u64 initial_time, u64 usec);
-
-template <typename T>
-void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threads, int initial, int duration);
 
 template <typename T>
 void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range)
