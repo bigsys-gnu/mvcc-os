@@ -3,6 +3,7 @@
 
 #include <sys/mman.h>
 #include "pthread.h"
+#include "arch.h"
 
 #define __init
 #define EXPORT_SYMBOL(sym)
@@ -145,7 +146,7 @@ static inline void port_free(void *ptr)
  * Synchronization
  */
 
-#define port_cpu_relax_and_yield() __asm__ volatile("rep; nop")
+#define port_cpu_relax_and_yield() cpu_relax()
 
 static inline void port_spin_init(pthread_spinlock_t *lock)
 {
@@ -213,10 +214,10 @@ static int port_create_thread(const char *name, pthread_t *t,
 	return pthread_create(t, NULL, fn, arg);
 }
 
-/* static void port_finish_thread(void *x) */
-/* { */
-/* 	/\* do nothing *\/ */
-/* } */
+static void port_finish_thread(void *x)
+{
+	/* do nothing */
+}
 
 static void port_wait_for_finish(pthread_t *t, void *x)
 {

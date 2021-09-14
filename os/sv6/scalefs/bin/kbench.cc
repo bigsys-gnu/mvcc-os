@@ -27,9 +27,12 @@ usage(const char *argv0)
   fprintf(stderr, "  -t the number of threads\n");
   fprintf(stderr, "  -d micro seconds of benchmark\n");
   fprintf(stderr, "  -u update ratio (20 is 2%%)\n");
-  fprintf(stderr, "  -r the range of random numbers\n");
+  fprintf(stderr, "  -r bench type\n");
   exit(2);
 }
+
+#define SPINLOCK 0
+#define MVRLU 1
 
 int
 main(int argc, char **argv)
@@ -40,7 +43,7 @@ main(int argc, char **argv)
 	int nb_threads = DEFAULT_NB_THREADS;
 	int duration = DEFAULT_DURATION;
 	int update = DEFAULT_UPDATE;
-	int range = DEFAULT_RANGE;
+    int type = SPINLOCK;
 
     int opt;
     while ((opt = getopt(argc, argv, "b:i:t:d:u:r:")) != -1)
@@ -48,7 +51,7 @@ main(int argc, char **argv)
         switch (opt)
         {
         case 'r':
-            range = atoi(optarg);
+            type = atoi(optarg);
             break;
         case 'u':
             update = atoi(optarg);
@@ -75,16 +78,16 @@ main(int argc, char **argv)
 	assert(initial >= 0);
 	assert(nb_threads > 0);
 	assert(update >= 0 && update <= 1000);
-	assert(range > 0 && range >= initial);
-    assert(n_buckets < range);
+	// assert(range > 0 && range >= initial);
+    // assert(n_buckets < range);
 
-    printf("-t #threads   : %d\n", nb_threads);
+    printf("-t #threads     : %d\n", nb_threads);
     printf("-i Initial size : %d\n", initial);
     printf("-b Buckets      : %d\n", n_buckets);
     printf("-d Duration     : %d\n", duration);
     printf("-u Update rate  : %d\n", update);
-    printf("-r Range        : %d\n", range);
-    printf("-Set type     : hash-list\n");
+    printf("-r bench type   : %d\n", type);
+    printf("-Set type       : hash-list\n");
 
 
     benchmark(
@@ -93,7 +96,7 @@ main(int argc, char **argv)
         n_buckets,
         duration,
         update,
-        range);
+        type);
 
     return 1;
 }
