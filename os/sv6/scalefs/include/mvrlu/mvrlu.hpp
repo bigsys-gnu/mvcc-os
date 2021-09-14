@@ -44,6 +44,7 @@ namespace mvrlu {
 
     ~thread_handle(void) {
       ::mvrlu_thread_finish(&self_);
+      ::mvrlu_thread_free(&self_);
     }
 
     // don't deallocate memory right away
