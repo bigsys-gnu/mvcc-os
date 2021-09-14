@@ -34,8 +34,9 @@ void sleep_usec(u64 initial_time, u64 usec);
 // BENCHMARK TYPES
 /////////////////////////////////////
 enum bench_type {
-  SPINLOCK,
-  MVRLU
+  SPINLOCK = 0,
+  MVRLU = 1,
+  RCU = 2
 };
 //////////////////////////////////////
 // RANDOM FUNCTIONS
@@ -336,10 +337,11 @@ struct rcu_hash_list : public chainhash<int, int> {
     total_node_num_ = 0;
     enumerate([this](int, int){
       this->total_node_num_++;
-      return true;
+      return false;
     });
     return total_node_num_;
   }
+  NEW_DELETE_OPS(rcu_hash_list);
 private:
   int total_node_num_;
 };
@@ -818,9 +820,12 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
     bench<spinlock>(nb_threads, initial, n_buckets, duration, update, range);
     cprintf("spinlock\n");
     break;
-  default:
+  case MVRLU:
     bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
     cprintf("mvrlu\n");
+  case RCU:
+    bench<rcu_bench>(nb_threads, initial, n_buckets, duration, update, range);
+    cprintf("rcu + seqlock\n");
     break;
   }
   stop = 0;
