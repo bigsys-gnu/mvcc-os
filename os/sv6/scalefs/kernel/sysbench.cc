@@ -823,9 +823,15 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
   case MVRLU:
     bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
     cprintf("mvrlu\n");
+    break;
   case RCU:
     bench<rcu_bench>(nb_threads, initial, n_buckets, duration, update, range);
     cprintf("rcu + seqlock\n");
+    break;
+  default:
+    cprintf("0: spinlock\n"
+            "1: mvrlu\n"
+            "2: rcu + seqlock\n");
     break;
   }
   stop = 0;
