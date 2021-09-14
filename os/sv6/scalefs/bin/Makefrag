@@ -152,6 +152,7 @@ FSEXTRA += \
 	bin/forktest-ben\
 	bin/mailbench-ben\
 	bin/fdbench-ben \
+	bin/mvcc_bench \
 
 # (ULIBA will be empty for native builds)
 UPROGS_LIBS := $(ULIBA) $(LIBUTIL_A)

@@ -1,0 +1,66 @@
+* to_json 사용법
+  user level benchmark의 출력 포멧은 다음과 같이 수정되어 있습니다.
+  - bench 시작시
+    #+BEGIN_SRC C
+  printf("\n#### mvcc bench ####\n");
+  printf( "-Nb threads   : %d\n", nb_threads);
+  printf( "-Initial size : %d\n", initial);
+  printf( "-Buckets      : %d\n", n_buckets);
+  printf( "-Duration     : %d\n", duration);
+  printf( "-Update rate  : %d\n", update);
+  printf( "-range        : %d\n", range);
+  printf( "-Set type     : hash-list\n");
+    #+END_SRC
+
+  - bench 종료시
+    #+BEGIN_SRC C
+  printf("\n#### total ####\n");
+  printf("Set size      : %lu (expected: %lu)\n", total_size, exp);
+  printf("Duration      : %d (ms)\n", duration);
+  iv = (reads + updates) * 1000.0 / duration;
+  fv = (int)((reads + updates) * 1000.0 / duration * 10) % 10;
+  printf("#ops          : %lu (%lu.%lu / s)\n", reads + updates, iv, fv);
+  iv = reads * 1000.0 / duration;
+  fv = (int)(reads * 1000.0 / duration * 10) % 10;
+  printf("#read ops     : %lu (%lu.%lu / s)\n", reads, iv, fv);
+  iv = updates * 1000.0 / duration;
+  fv = (int)(updates * 1000.0 / duration * 10) % 10;
+  printf("#update ops   : %lu (%lu.%lu / s)\n", updates, iv, fv);
+    #+END_SRC
+
+ 위 포멧을 수정하지 말아주시기 바랍니다
+ - script
+   #+BEGIN_SRC sh
+     #!/sh
+     # threadnum, bucket, time, update ratio, range
+
+     for th_num in {1..8}; do
+         for i in 1 {1..20}; do
+             ./mvrlu_bench $th_num 1000 10 10000 20 1000
+         done
+     done
+   #+END_SRC
+   bin 폴더에 mvcc_bench라는 script가 있습니다.
+   한번 파싱할 파일을 생성할 때 Thread 숫자만 변경되게 하고 
+   다른 옵션은 고정되어야 합니다.
+
+** 사용법
+   1. qemu 실행
+    #+BEGIN_SRC bash
+    make qemu | tee <file>
+    #+END_SRC
+
+   2. script 실행
+      script를 실행하고 qemu를 종료합니다.
+
+   3. parsing
+      to_json을 생성된 파일을 인자로 실행합니다. (python3로 실행)
+
+   4. 결과
+      - 그래프 (matplotlib 필요)
+      - json 파일 생성
+
+** 요구사항
+   - python matplotlib
+   - dos2unix
+
