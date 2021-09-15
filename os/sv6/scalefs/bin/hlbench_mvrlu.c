@@ -229,9 +229,10 @@ void *test(void* param)
   if (setaffinity(p_data->id % NCPU) < 0)
   {
     RLU_THREAD_FINISH(self);
+    RLU_THREAD_FREE(self);
     die("affinity error");
   }
-
+  mvrlu_flush_log(self);
   pthread_barrier_wait(&bar);
 
   while (*p_data->stop == 0)
@@ -271,6 +272,7 @@ void *test(void* param)
     }
 
   RLU_THREAD_FINISH(self);
+  RLU_THREAD_FREE(self);
   printf("thread %d end\n", p_data->id);
   return NULL;
 }
