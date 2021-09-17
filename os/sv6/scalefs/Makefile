@@ -185,7 +185,7 @@ xv6memfs.img: bootblock kernelmemfs
 
 
 ifeq ($(HW),qemu)
-JOURNALS = $(foreach num, $(shell seq 0 15), sv6journal${num})
+JOURNALS = $(foreach num, $(shell seq 0 $(shell dc -e "${QEMUSMP} 1 - p")), sv6journal${num})
 FSEXTRA += ${JOURNALS}
 FSEXTRA += testfile1 README
 else
