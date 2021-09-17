@@ -27,7 +27,7 @@ usage(const char *argv0)
   fprintf(stderr, "  -t the number of threads\n");
   fprintf(stderr, "  -d micro seconds of benchmark\n");
   fprintf(stderr, "  -u update ratio (20 is 2%%)\n");
-  fprintf(stderr, "  -r bench type\n");
+  fprintf(stderr, "  -s sync type\n");
   exit(2);
 }
 
@@ -46,11 +46,11 @@ main(int argc, char **argv)
     int type = SPINLOCK;
 
     int opt;
-    while ((opt = getopt(argc, argv, "b:i:t:d:u:r:")) != -1)
+    while ((opt = getopt(argc, argv, "b:i:t:d:u:s:")) != -1)
     {
         switch (opt)
         {
-        case 'r':
+        case 's':
             type = atoi(optarg);
             break;
         case 'u':
@@ -86,8 +86,8 @@ main(int argc, char **argv)
     printf("-b Buckets      : %d\n", n_buckets);
     printf("-d Duration     : %d\n", duration);
     printf("-u Update rate  : %d\n", update);
-    printf("-r bench type   : %d\n", type);
-    printf("-Set type       : hash-list\n");
+    printf("-s sync type    : %d\n", type);
+    printf("Benchmark type  : hash-list\n");
 
 
     benchmark(
