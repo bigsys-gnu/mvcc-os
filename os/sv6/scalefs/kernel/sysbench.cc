@@ -31,9 +31,9 @@ void print_outcome(hash_list<T> &hl, thread_param<T> *param_list[], int nb_threa
 void sleep_usec(u64 initial_time, u64 usec);
 
 //////////////////////////////////////
-// BENCHMARK TYPES
+// SYNCHRONOUS TYPES
 /////////////////////////////////////
-enum bench_type {
+enum sync_type {
   SPINLOCK = 0,
   MVRLU = 1,
   RCU = 2
@@ -802,9 +802,9 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 //SYSCALL
 void
 sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int update,
-              int bench_type)
+              int sync_type)
 {
-  enum bench_type type = (enum bench_type) bench_type;
+  enum sync_type type = (enum sync_type) sync_type;
   cprintf("Run Kernel Level Benchmark\n");
   int range = initial * 2;
 
@@ -829,10 +829,7 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
     cprintf("rcu + seqlock\n");
     break;
   default:
-    cprintf("0: spinlock\n"
-            "1: mvrlu\n"
-            "2: rcu + seqlock\n");
-    break;
+    cprintf("Wrong sync type!\n");
   }
   stop = 0;
   cprintf("Kernel Level Benchmark END\n");
