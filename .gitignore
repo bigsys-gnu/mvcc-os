@@ -9,6 +9,9 @@ exp/
 __*.txt
 *.pyc
 
+.DS_Store
+
+
 sync/bin
 os/Xv6-kernel-threads/bootother
 os/Xv6-kernel-threads/fs/*
