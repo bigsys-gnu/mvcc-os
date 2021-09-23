@@ -13,6 +13,7 @@
 #include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
 #include "chainhash.hh"
+#include "bench/chainhash_spinlock.hh"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
@@ -59,7 +60,8 @@ void wait_and_wakeup(void) {
 enum sync_type {
   SPINLOCK = 0,
   MVRLU = 1,
-  RCU = 2
+  RCU = 2,
+  SPIN_CHAIN = 3
 };
 //////////////////////////////////////
 // RANDOM FUNCTIONS
@@ -441,6 +443,81 @@ void test<rcu_bench>(void *param) {
 // RCU END
 /////////////////////////////////////
 //////////////////////////////////////
+// SPIN CHAIN START
+/////////////////////////////////////
+struct spin_chain : public chainhash_spinlock<int, int> {
+  spin_chain(u64 nbuckets): chainhash_spinlock<int, int>(nbuckets) {}
+
+  int get_total_node_num(void) {
+    int total_node_num = 0;
+    enumerate([&total_node_num](int, int){
+      total_node_num++;
+      return false;
+    });
+    return total_node_num;
+  }
+
+  int raw_insert(int key) {
+    return insert(key, key);
+  }
+
+  NEW_DELETE_OPS(spin_chain);
+};
+
+struct spin_chain_bench: public bench_trait {
+  using data_structure = spin_chain;
+};
+
+template <>
+void test<spin_chain_bench>(void *param) {
+  int op, value;
+  auto *p_data = reinterpret_cast<thread_param<spin_chain_bench> *>(param);
+  auto &hash_list = *p_data->hl;
+
+  wait_on_barrier();
+
+  cprintf("thread %d Start\n", myproc()->pid);
+  // need condition for barrier
+  while (p_data->stop == 0)
+    {
+      op = rand_range(1000, p_data->seed);
+      value = rand_range(p_data->range, p_data->seed);
+
+      if (op < p_data->update)
+        {
+          if ((op & 0x01) == 0)
+            {
+              if (hash_list.insert(value, value))
+                {
+                  p_data->variation++;
+                }
+              p_data->result_add++;
+            }
+          else
+            {
+              if (hash_list.remove(value, value))
+                {
+                  p_data->variation--;
+                }
+              p_data->result_remove++;
+            }
+        }
+      else
+        {
+          if(hash_list.lookup(value))
+            {
+              p_data->result_contains++;
+            }
+          p_data->result_found++;
+        }
+    }
+  cprintf("thread %d end\n", myproc()->pid);
+}
+
+//////////////////////////////////////
+// SPIN CHAIN END
+/////////////////////////////////////
+//////////////////////////////////////
 // MVRLU START
 /////////////////////////////////////
 struct mvrlu_bench: public bench_trait {
@@ -758,6 +835,10 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
   case RCU:
     bench<rcu_bench>(nb_threads, initial, n_buckets, duration, update, range);
     PRINT_BENCH(RCU);
+    break;
+  case SPIN_CHAIN:
+    bench<spin_chain_bench>(nb_threads, initial, n_buckets, duration, update, range);
+    PRINT_BENCH(SPIN_CHAIN);
     break;
   default:
     cprintf("Wrong sync type! 0:spinlock 1:mvrlu 2:rcu+seqlock\n");
