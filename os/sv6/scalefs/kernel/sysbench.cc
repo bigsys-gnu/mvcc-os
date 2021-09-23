@@ -19,6 +19,7 @@
 #include <uk/unistd.h>
 
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
+#define PRINT_BENCH(BENCH) cprintf("************" #BENCH "***************\n")
 template <typename T>
 struct thread_param;
 
@@ -748,15 +749,15 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
   switch (type) {
   case SPINLOCK:
     bench<spinlock_bench>(nb_threads, initial, n_buckets, duration, update, range);
-    cprintf("spinlock\n");
+    PRINT_BENCH(SPINLOCK);
     break;
   case MVRLU:
     bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
-    cprintf("mvrlu\n");
+    PRINT_BENCH(MVRLU);
     break;
   case RCU:
     bench<rcu_bench>(nb_threads, initial, n_buckets, duration, update, range);
-    cprintf("rcu + seqlock\n");
+    PRINT_BENCH(RCU);
     break;
   default:
     cprintf("Wrong sync type!\n");
