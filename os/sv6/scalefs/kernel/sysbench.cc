@@ -21,8 +21,10 @@
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
 template <typename T>
 struct thread_param;
+
 template <typename T>
 void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range);
+
 template <typename T>
 struct hash_list;
 
@@ -33,6 +35,7 @@ get_total_node_num(hash_list<T> &hl);
 template <typename T>
 void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[],
                    int nb_threads, int initial, int duration);
+
 void sleep_usec(u64 initial_time, u64 usec);
 
 struct bench_trait {
@@ -109,7 +112,6 @@ class hash_list {
 public:
   hash_list(int n_buckets): n_buckets_(n_buckets)
   {
-
     buckets_ = new list<T> *[n_buckets];
     for (int i = 0; i < n_buckets; i++)
       buckets_[i] = new list<T>();
@@ -124,7 +126,7 @@ public:
 
   list<T> *
   get_list(int key) {
-    return buckets_[key];
+    return buckets_[key % n_buckets_];
   }
 
   // only for initialization
@@ -185,6 +187,7 @@ void bench_finish(void) {}
 struct spinlock_bench: public bench_trait {
   using data_structure = hash_list<spinlock_bench>;
 };
+
 template <>
 class list<spinlock_bench> {
   node *head_;
@@ -652,7 +655,6 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 {
   bench_init<T>();
 
-  // hash_list<T> *hl = new hash_list<T>(n_buckets);
   auto *hl = new typename T::data_structure(n_buckets);
 
   cprintf("initialize %d nodes...", initial);
