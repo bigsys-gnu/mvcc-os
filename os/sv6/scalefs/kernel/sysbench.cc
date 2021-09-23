@@ -829,7 +829,7 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
     cprintf("rcu + seqlock\n");
     break;
   default:
-    cprintf("Wrong sync type!\n");
+    cprintf("Wrong sync type! 0:spinlock 1:mvrlu 2:rcu+seqlock\n");
   }
   stop = 0;
   cprintf("Kernel Level Benchmark END\n");
