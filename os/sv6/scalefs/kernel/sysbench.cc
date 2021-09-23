@@ -29,10 +29,6 @@ template <typename T>
 struct hash_list;
 
 template <typename T>
-unsigned long
-get_total_node_num(hash_list<T> &hl);
-
-template <typename T>
 void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[],
                    int nb_threads, int initial, int duration);
 
@@ -41,6 +37,21 @@ void sleep_usec(u64 initial_time, u64 usec);
 struct bench_trait {
   using data_structure = hash_list<bench_trait>;
 };
+//////////////////////////////////////
+// GLOBAL DATA
+/////////////////////////////////////
+condvar thread_bar("barrier");
+spinlock bar_lock("barrier");
+
+void wait_on_barrier(void) {
+  scoped_acquire l(&bar_lock);
+  thread_bar.sleep(&bar_lock);
+}
+
+void wait_and_wakeup(void) {
+  sleep_usec(nsectime(), 1000);
+  thread_bar.wake_all();
+}
 //////////////////////////////////////
 // SYNCHRONOUS TYPES
 /////////////////////////////////////
@@ -98,12 +109,7 @@ struct node {
 };
 
 template <typename T>
-class list {
-  int list_insert(T& data, int key) { return 0; }
-  int list_delete(T& data, int key) { return 0; }
-  int list_find(T& data, int key) { return 0; }
-  int get_total_node_number(void) { return 0; }
-};
+class list {};
 
 template <typename T>
 class hash_list {
@@ -306,6 +312,8 @@ void test<spinlock_bench>(void *param) {
   auto *p_data = reinterpret_cast<thread_param<spinlock_bench> *>(param);
   auto &hash_list = *p_data->hl;
 
+  wait_on_barrier();
+
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
   while (p_data->stop == 0)
@@ -388,6 +396,8 @@ void test<rcu_bench>(void *param) {
   int op, value;
   auto *p_data = reinterpret_cast<thread_param<rcu_bench> *>(param);
   auto &hash_list = *p_data->hl;
+
+  wait_on_barrier();
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
@@ -606,6 +616,8 @@ void test<mvrlu_bench>(void *param) {
   auto &hash_list = *p_data->hl;
   auto *handle = new mvrlu::thread_handle<mvrlu_node>();
 
+  wait_on_barrier();
+
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
   while (p_data->stop == 0)
@@ -675,7 +687,6 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   thread_param<T> **param_list = new thread_param<T> *[nb_threads];
 
   // mile sec
-  u64 initial_time = nsectime();
   cprintf("Main thread ID: %d\n", myproc()->pid);
   cprintf("Creating %d threads...", nb_threads);
 
@@ -691,9 +702,12 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
     cprintf("\nThread created %p(c:%d, s:%d)\n", thread_list[i], i%(NCPU-1)+1,
             thread_list[i]->get_state());
   }
-  cprintf(" done!\n");
 
-  sleep_usec(initial_time, duration);
+  wait_and_wakeup();
+
+  cprintf("\nstart bench!\n");
+
+  sleep_usec(nsectime(), duration);
 
   stop = 1;
   cprintf("join %d threads...\n", nb_threads);
@@ -762,14 +776,6 @@ void sleep_usec(u64 initial_time, u64 usec) {
   scoped_acquire local(&l);
   if (until > nsectime())
     cond.sleep_to(&l, until);
-}
-
-template <typename T>
-unsigned long
-get_total_node_num(typename T::data_structure &hl)
-{
-  unsigned long total_size = hl.get_total_node_num();
-  return total_size;
 }
 
 template <typename T>
