@@ -1,13 +1,10 @@
 #include <stdio.h>
 #include <stdlib.h>
-#include <pthread.h>
 #include <unistd.h>
-
-#define assert(COND)\
-  if (!(COND)) {\
-  printf(#COND);\
-  exit(1);\
-  }
+#include <pthread.h>
+#include "urcu.h"
+#include "libutil.h"
+#include <time.h>
 
 #define MAX_BUCKETS (2048)
 #define DEFAULT_BUCKETS                 1
@@ -17,6 +14,40 @@
 #define DEFAULT_NB_THREADS              1
 #define DEFAULT_RANGE                   (DEFAULT_INITIAL * 2)
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list->n_buckets)
+/////////////////////////////////////////////////////////
+// HELPER FUNCTIONS
+/////////////////////////////////////////////////////////
+static inline int MarsagliaXORV (int x) { 
+  if (x == 0) x = 1 ; 
+  x ^= x << 6;
+  x ^= ((unsigned)x) >> 21;
+  x ^= x << 7 ; 
+  return x ;        // use either x or x & 0x7FFFFFFF
+}
+
+static inline int MarsagliaXOR (int * seed) {
+  int x = MarsagliaXORV(*seed);
+  *seed = x ; 
+  return x & 0x7FFFFFFF;
+}
+
+static inline void rand_init(unsigned short *seed)
+{
+  seed[0] = (unsigned short)rand();
+  seed[1] = (unsigned short)rand();
+  seed[2] = (unsigned short)rand();
+}
+
+static inline int rand_range(int n, unsigned short *seed)
+{
+  /* Return a random number in range [0;n) */
+  
+  /*int v = (int)(erand48(seed) * n);
+  assert (v >= 0 && v < n);*/
+  
+  int v = MarsagliaXOR((int *)seed) % n;
+  return v;
+}
 
 typedef struct node {
   int value;
@@ -46,8 +77,10 @@ typedef struct thread_param {
   int result_found;
   int *stop;
   hash_list_t *p_hash_list;
+  unsigned short seed[3];
 } thread_param_t;
 
+struct rcu_maintain rcu_global;
 static pthread_barrier_t bar;
 int n_buckets = DEFAULT_BUCKETS;
 int initial = DEFAULT_INITIAL;
@@ -86,54 +119,64 @@ raw_list_insert(int key, list_t *list)
     new_node->next = cur;
     prev->next = new_node;
   }
+
   return ret;
 }
 
 int list_insert(int key, list_t *list)
 {
-  node_t *prev, *cur, *new_node;
-  int ret = 0;
+    node_t *prev, *cur, *new_node;
+    int ret = 0;
 
-  pthread_mutex_lock(&list->l);
+    pthread_mutex_lock(&list->l);
 
-  for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
-  {
-    if (cur->value > key)
+    for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
     {
-      /* initialize node */
-      new_node = (node_t *) malloc(sizeof(node_t));
-      new_node->value = key;
+      if (cur->value > key)
+      {
+        /* initialize node */
+        new_node = (node_t *) malloc(sizeof(node_t));
+        new_node->value = key;
 
-      /* insert node */
-      new_node->next = prev->next;
-      prev->next = new_node;
-      ret = 1;
-      break;
+        /* insert node */
+        new_node->next = prev->next;  //read
+        do {
+          prev->next = new_node;  //write
+          __sync_synchronize();
+        } while(0);
+          
+        ret = 1;
+	    break;
+      }
+      else if (cur->value == key)
+      {
+        pthread_mutex_unlock(&list->l);
+        return ret;             /* the key value already exists. */
+      }
     }
-    else if (cur->value == key)
-    {
-      pthread_mutex_unlock(&list->l);
-      return ret;             /* the key value already exists. */
-    }    
-  }
 
   if (ret == 0 && cur == NULL)      /* cur is NULL now */
     {
       /* initialize node */
       new_node = (node_t *) malloc(sizeof(node_t));
-      new_node->value = key;
+      new_node->value = key; //read
       
       /* insert node */
-      new_node->next = prev->next;
-      prev->next = new_node;
+      new_node->next = prev->next; //read
+      do {
+          prev->next = new_node; //write
+		  __sync_synchronize();
+	    } while(0);
+
       ret = 1;
     }
 
   pthread_mutex_unlock(&list->l);
   return ret;
+
 }
 
-int list_delete(int key, list_t *list)
+int list_delete(int key, list_t *list, struct rcu_data *d)
 {
   node_t *prev, *cur, *cur_n;
   int ret = 0;
@@ -151,33 +194,33 @@ int list_delete(int key, list_t *list)
       break;
     }
   }
+  rcu_synchronize(&rcu_global, d);
   pthread_mutex_unlock(&list->l);
   free(cur);
 
   return ret;
 }
 
-int list_find(int key, list_t *list)
+int list_find(int key, list_t *list, struct rcu_data *d)
 {
   node_t *cur;
   int value = -1;
 
-  pthread_mutex_lock(&list->l);
-
+  rcu_reader_lock(&rcu_global, d);
   cur = list->head;
 
   while(cur != NULL)
   {
     /* found the value. */
     if (cur->value == key)
-	  {
+	{
       value = cur->value;
       break;
-	  }
-	  cur = cur->next;
+	}
+	cur = cur->next;
   }
 
-  pthread_mutex_unlock(&list->l);
+  rcu_reader_unlock(&rcu_global, d);
   return value;
 }
 
@@ -185,16 +228,21 @@ void *test(void* param)
 {
   int op, bucket, value;
   value = 1;//sys_uptime();
+  struct rcu_data self;
 
   thread_param_t *p_data = (thread_param_t*)param; 
   hash_list_t *p_hash_list = p_data->p_hash_list;
 
+  if (setaffinity(p_data->id % NCPU) < 0)
+    die("Error setaffinity\n");
+
+  rcu_register(&rcu_global, &self);
   pthread_barrier_wait(&bar);
 
   while (*p_data->stop == 0)
   {
-    op = rand() % 1000;
-    value = rand() % (p_data->range);
+    op = rand_range(1000, p_data->seed);
+    value = rand_range(p_data->range, p_data->seed);
     bucket = HASH_VALUE(p_hash_list, value);
     list_t *p_list = p_hash_list->buckets[bucket];
 
@@ -210,7 +258,7 @@ void *test(void* param)
       }
       else
       {
-        if (list_delete(value, p_list))
+        if (list_delete(value, p_list, &self))
         {
           p_data->variation--;
         }
@@ -219,7 +267,7 @@ void *test(void* param)
     }
     else
     {
-      if(list_find(value, p_list) >= 0)
+      if(list_find(value, p_list, &self) >= 0)
       {
         p_data->result_found++;
       }
@@ -235,6 +283,7 @@ int main(int argc, char **argv)
 {
   thread_param_t *param_list;
   hash_list_t *p_hash_list;
+  //int *thread_list;
   pthread_t *thread_list;
   int stop = 0;
   unsigned long exp = 0, total_variation = 0, total_size = 0;
@@ -242,6 +291,8 @@ int main(int argc, char **argv)
   unsigned long iv = 0, fv = 0;
 
   int i;
+
+  srand(time(NULL));
 
   switch (argc - 1)
   {
@@ -261,7 +312,7 @@ int main(int argc, char **argv)
     printf("%d Option is inserted\n", argc - 1);
     break;
   }
-  printf("\n#### mvcc bench ####\n");
+  printf("\n#### Chaned hash table for RCU user-level ####\n");
   printf( "-Nb threads   : %d\n", nb_threads);
   printf( "-Initial size : %d\n", initial);
   printf( "-Buckets      : %d\n", n_buckets);
@@ -312,6 +363,8 @@ int main(int argc, char **argv)
     }
   printf("done\n");
 
+  rcu_init(&rcu_global, nb_threads);
+
   thread_list = (pthread_t *)malloc(nb_threads*sizeof(pthread_t));
   if (thread_list == NULL) {
     printf("thread_list init error\n");
@@ -323,7 +376,7 @@ int main(int argc, char **argv)
     printf("param_list init error\n");
     return 1;
   }
-
+   
   pthread_barrier_init(&bar, 0, nb_threads);
    
   printf("Creating %d threads...", nb_threads);
@@ -337,6 +390,8 @@ int main(int argc, char **argv)
       param_list[i].stop = &stop;
       param_list[i].variation = 0;
       param_list[i].p_hash_list = p_hash_list;
+	
+      rand_init(param_list[i].seed);
 
       pthread_create(&thread_list[i], 0, test, (void*)&param_list[i]);
     }

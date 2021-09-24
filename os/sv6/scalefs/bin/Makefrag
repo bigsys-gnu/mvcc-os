@@ -75,12 +75,12 @@ UPROGS_BIN= \
 	testrecovery \
 	dirloop \
 	rename-chain \
-	rlu_benchlist\
 	rlu_test\
-	list_rcu\
-	list_spinlock\
+	hlbench_mvrlu\
+	hlbench_rlu\
+	hlbench_rcu\
+	hlbench_spin\
 	pmutex\
-	mvrlu_bench\
 	condtest\
 
 ifeq ($(HAVE_LWIP),y)
