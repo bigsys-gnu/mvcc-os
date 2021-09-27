@@ -7,8 +7,7 @@
 #include <cstddef>
 
 namespace mvrlu {
-  template <typename T> class thread_handle;
-  template <typename T> class mvrlu_object;
+  class thread_handle;
 
   inline void
   mvrlu_free(void *ptr) {
@@ -35,7 +34,6 @@ namespace mvrlu {
     return (T *) ::mvrlu_alloc(sizeof(T));
   }
 
-  template <typename T>
   class thread_handle {
   public:
     thread_handle(void) {
@@ -52,12 +50,12 @@ namespace mvrlu {
     static void operator delete(void *, std::size_t) {}
 
     static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
-      assert(nbytes == sizeof(thread_handle<T>));
-      return port_alloc_x(sizeof(thread_handle<T>), 0);
+      assert(nbytes == sizeof(thread_handle));
+      return port_alloc_x(sizeof(thread_handle), 0);
     }
 
     static void* operator new(unsigned long nbytes) {
-      void *p = thread_handle<T>::operator new(nbytes, std::nothrow);
+      void *p = thread_handle::operator new(nbytes, std::nothrow);
       if (p == nullptr)
         throw_bad_alloc();
       return p;
@@ -73,6 +71,7 @@ namespace mvrlu {
       ::mvrlu_reader_unlock(&self_);
     }
 
+    template <typename T>
     inline bool
     mvrlu_try_lock(T** p_p_obj) {
       if (!*p_p_obj)
@@ -80,6 +79,7 @@ namespace mvrlu {
       return ::_mvrlu_try_lock(&self_, (void **)p_p_obj, sizeof(T));
     }
 
+    template <typename T>
     inline bool
     mvrlu_try_lock_const(T* obj) {
       if (!obj)
@@ -92,6 +92,7 @@ namespace mvrlu {
       ::mvrlu_abort(&self_);
     }
 
+    template <typename T>
     inline T*
     mvrlu_deref(T *p_obj) {
       return (T *) ::mvrlu_deref(&self_, (void *)p_obj);
@@ -101,6 +102,7 @@ namespace mvrlu {
     // - how to call deleter of p_obj properly
     // 1. mvrlu.c don't know p_obj is which type.
     // -> mvrlu.c need to be fixed using template?
+    template <typename T>
     inline void
     mvrlu_free(T *p_obj) {
       ::mvrlu_free(&self_, (void *)p_obj);
@@ -108,19 +110,6 @@ namespace mvrlu {
 
   private:
     mvrlu_thread_struct_t self_;
-    friend class mvrlu_object<T>;
-  };
-
-  template <typename T>
-  class mvrlu_object {
-    T *ptr_;
-    thread_handle<T> &handle_;
-  public:
-    mvrlu_object(T *ptr, thread_handle<T> &handle): ptr_(ptr), handle_(handle) {}
-    ~mvrlu_object(void) {
-      // in mvrlu.c, ptr_'s deleter will not be called!
-      handle_.mvrlu_free(ptr_);
-    }
   };
 
 }

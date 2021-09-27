@@ -565,7 +565,7 @@ public:
     }
   }
 
-  int list_insert(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+  int list_insert(mvrlu::thread_handle &h, int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
 
@@ -595,7 +595,7 @@ public:
     return ret;
   }
 
-  int list_delete(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+  int list_delete(mvrlu::thread_handle &h, int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
 
@@ -623,7 +623,7 @@ public:
     return ret;
   }
 
-  int list_find(mvrlu::thread_handle<mvrlu_node> &h, int key) {
+  int list_find(mvrlu::thread_handle &h, int key) {
     int value = -1;
 
     h.mvrlu_reader_lock();
@@ -693,7 +693,7 @@ void test<mvrlu_bench>(void *param) {
   int op, bucket, value;
   auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
   auto &hash_list = *p_data->hl;
-  auto *handle = new mvrlu::thread_handle<mvrlu_node>();
+  auto *handle = new mvrlu::thread_handle();
 
   wait_on_barrier();
 
