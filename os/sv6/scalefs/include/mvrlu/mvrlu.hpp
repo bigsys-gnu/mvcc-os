@@ -108,6 +108,11 @@ namespace mvrlu {
       ::mvrlu_free(&self_, (void *)p_obj);
     }
 
+    void
+    mvrlu_flush_log(void) {
+      ::mvrlu_flush_log(&self_);
+    }
+
   private:
     mvrlu_thread_struct_t self_;
   };

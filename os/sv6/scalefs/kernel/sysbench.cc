@@ -698,8 +698,16 @@ public:
 
   int get_total_node_num(void) {
     int total_num = 0;
-    for (auto iter = head_->next; iter != NULL; iter = iter->next)
+    mvrlu::thread_handle &h = *myproc()->handle;
+    mvrlu_node *iter;
+
+    h.mvrlu_reader_lock();
+    for (iter = h.mvrlu_deref(head_->next); iter != nullptr;
+         iter = h.mvrlu_deref(iter->next))
+    {
       total_num++;
+    }
+    h.mvrlu_reader_unlock();
     return total_num;
   }
 
@@ -751,6 +759,7 @@ void test<mvrlu_bench>(void *param) {
           p_data->result_found++;
         }
     }
+  myproc()->handle->mvrlu_flush_log();
   cprintf("thread %d end\n", myproc()->pid);
 }
 //////////////////////////////////////
