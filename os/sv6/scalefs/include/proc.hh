@@ -9,6 +9,7 @@
 #include "ilist.hh"
 #include <stdexcept>
 #include "vmalloc.hh"
+#include "mvrlu/mvrlu.hpp"
 
 struct pgmap;
 struct gc_handle;
@@ -111,6 +112,8 @@ struct proc {
   u64 magic;
   uptr unmapped_hint;
   sigaction sig[NSIG];
+
+  mvrlu::thread_handle* handle;
 
   static proc* alloc();
   void         set_state(procstate_t s);

@@ -1286,10 +1286,10 @@ static inline int wakeup_qp_thread_for_reclaim(void)
 /*
  * External APIs
  */
-static int init = 0;
 int mvrlu_init(void)
 {
 	int rc;
+    static int init = 0;
 
 	/* Compile time sanity check */
 	/* static_assert(sizeof(mvrlu_act_hdr_struct_t) < L1_CACHE_BYTES); */
@@ -1324,7 +1324,6 @@ void mvrlu_finish(void)
 	thread_list_destroy(&g_live_threads);
 	thread_list_destroy(&g_zombie_threads);
 	port_log_region_destroy();
-    smp_cas(&init, 1, 0);
 }
 
 mvrlu_thread_struct_t *mvrlu_thread_alloc(void)

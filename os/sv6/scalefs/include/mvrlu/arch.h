@@ -49,11 +49,6 @@ extern "C" {
 #define __packed __attribute__((packed))
 #endif
 
-#ifndef static_assert
-#define static_assert(e) (sizeof(struct { int : (-!(e)); }))
-#define static_assert_msg(e, msg) static_assert(e)
-#endif
-
 static inline void __attribute__((__always_inline__)) smp_mb(void)
 {
 	__asm__ __volatile__("mfence" ::: "memory");

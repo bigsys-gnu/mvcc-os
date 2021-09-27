@@ -557,17 +557,43 @@ class list<mvrlu_bench> {
 public:
   list(void):head_(new mvrlu_node(0)) {}
   ~list(void) {
-    for (auto iter = head_; iter != NULL; )
-    {
-      auto trash = iter;
-      iter = iter->next;
-      delete trash;
-    }
+    while (pop());
   }
 
-  int list_insert(mvrlu::thread_handle &h, int key) {
+  int pop(void) {
+    mvrlu_node *iter;
+    mvrlu::thread_handle &h = *myproc()->handle;
+
+  restart:
+    h.mvrlu_reader_lock();
+    iter = h.mvrlu_deref(head_->next);
+    if (!iter)
+    {
+      if (!h.mvrlu_try_lock(&head_))
+      {
+        h.mvrlu_abort();
+        goto restart;
+      }
+      h.mvrlu_free(head_);
+      head_ = nullptr;
+      return 0;
+    }
+    if (!h.mvrlu_try_lock(&head_) ||
+        !h.mvrlu_try_lock_const(iter))
+    {
+      h.mvrlu_abort();
+      goto restart;
+    }
+    mvrlu::mvrlu_assign_pointer(&head_->next, iter->next);
+    h.mvrlu_free(iter);
+    h.mvrlu_reader_unlock();
+    return 1;
+  }
+
+  int list_insert(int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
+    mvrlu::thread_handle &h = *myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -595,9 +621,10 @@ public:
     return ret;
   }
 
-  int list_delete(mvrlu::thread_handle &h, int key) {
+  int list_delete(int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
+    mvrlu::thread_handle &h = *myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -623,8 +650,9 @@ public:
     return ret;
   }
 
-  int list_find(mvrlu::thread_handle &h, int key) {
+  int list_find(int key) {
     int value = -1;
+    mvrlu::thread_handle &h = *myproc()->handle;
 
     h.mvrlu_reader_lock();
     auto *cur = h.mvrlu_deref(head_);
@@ -679,21 +707,10 @@ public:
 };
 
 template <>
-void bench_init<mvrlu_bench>(void) {
-  mvrlu_init();
-}
-
-template <>
-void bench_finish<mvrlu_bench>(void) {
-  mvrlu_finish();
-}
-
-template <>
 void test<mvrlu_bench>(void *param) {
   int op, bucket, value;
   auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
   auto &hash_list = *p_data->hl;
-  auto *handle = new mvrlu::thread_handle();
 
   wait_on_barrier();
 
@@ -710,7 +727,7 @@ void test<mvrlu_bench>(void *param) {
         {
           if ((op & 0x01) == 0)
             {
-              if (p_list->list_insert(*handle, value))
+              if (p_list->list_insert(value))
                 {
                   p_data->variation++;
                 }
@@ -718,7 +735,7 @@ void test<mvrlu_bench>(void *param) {
             }
           else
             {
-              if (p_list->list_delete(*handle, value))
+              if (p_list->list_delete(value))
                 {
                   p_data->variation--;
                 }
@@ -727,14 +744,13 @@ void test<mvrlu_bench>(void *param) {
         }
       else
         {
-          if(p_list->list_find(*handle, value) >= 0)
+          if(p_list->list_find(value) >= 0)
             {
               p_data->result_contains++;
             }
           p_data->result_found++;
         }
     }
-  delete handle;
   cprintf("thread %d end\n", myproc()->pid);
 }
 //////////////////////////////////////
