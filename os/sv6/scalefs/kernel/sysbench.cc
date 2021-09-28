@@ -13,7 +13,7 @@
 #include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
 #include "chainhash.hh"
-#include "bench/chainhash_spinlock.hh"
+#include "chainhash_spinlock.hh"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
@@ -841,7 +841,8 @@ sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int upda
     PRINT_BENCH(SPIN_CHAIN);
     break;
   default:
-    cprintf("Wrong sync type! 0:spinlock 1:mvrlu 2:rcu+seqlock\n");
+    cprintf("Wrong sync type! ");
+    cprintf("0:spinlock 1:mvrlu 2:rcu+seqlock 3:chainhash w/spinlock\n");
   }
   stop = 0;
   cprintf("Kernel Level Benchmark END\n");
