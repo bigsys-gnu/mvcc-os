@@ -5,13 +5,15 @@
  */
 
 #include "spinlock.hh"
-#include "seqlock.hh"
 #include "lockwrap.hh"
 #include "hash.hh"
 #include "ilist.hh"
 #include "hpet.hh"
 #include "cpuid.hh"
 
+/*
+ * MV-RLU manages only pure value
+ */
 namespace mvrlu {
   
   template<class K, class V>
@@ -25,7 +27,6 @@ namespace mvrlu {
       NEW_DELETE_OPS(item);
 
       islink<item> link;  //ilist.hh -> singly-linked lists
-      seqcount<u32> seq;  //seqlock.hh -> a synchronization primitive
       const K key;
       V val;
     };
@@ -149,8 +150,7 @@ namespace mvrlu {
         bucket* b = &buckets_[i];
 
         for (const item& i: b->chain) {
-          V val = *seq_reader<V>(&i.val, &i.seq);
-          if (cb(i.key, val))
+          if (cb(i.key, i.val))
             return;
         }
       }
@@ -186,7 +186,7 @@ namespace mvrlu {
         if (i.key != k)
           continue;
         if (vptr)
-          *vptr = *seq_reader<V>(&i.val, &i.seq);
+          *vptr = i.val;
         return true;
       }
       return false;
