@@ -342,9 +342,11 @@ int main(int argc, char **argv)
 
   printf("initialize %d nodes...", initial);
   int j = 0;
+  unsigned short seed[3];
+  rand_init(seed);
   while (j < initial)
     {
-      int value = rand() % range;
+      int value = rand_range(range, seed);
       int bucket = HASH_VALUE(p_hash_list, value);
 
       if (raw_list_insert(value, p_hash_list->buckets[bucket]))

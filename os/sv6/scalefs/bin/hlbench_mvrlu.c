@@ -226,7 +226,7 @@ void *test(void* param)
   hash_list_t *p_hash_list = p_data->p_hash_list;
   rlu_thread_data_t *self = &p_data->self;
 
-  if (setaffinity(p_data->id % NCPU) < 0)
+  if (setaffinity((p_data->id + 1) % NCPU) < 0)
   {
     RLU_THREAD_FINISH(self);
     RLU_THREAD_FREE(self);
@@ -348,9 +348,11 @@ int main(int argc, char **argv)
 
   printf("initialize %d nodes...", initial);
   int j = 0;
+  unsigned short seed[3];
+  rand_init(seed);
   while (j < initial)
     {
-      int value = rand() % range;
+      int value = rand_range(range, seed);
       int bucket = HASH_VALUE(p_hash_list, value);
 
       if (raw_list_insert(value, p_hash_list->buckets[bucket]))
