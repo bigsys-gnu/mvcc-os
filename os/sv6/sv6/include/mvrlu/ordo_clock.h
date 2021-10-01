@@ -5,7 +5,7 @@
 extern "C" {
 #endif
 
-#include "arch.h"
+#include "amd64.h"
 
 #define ORDO_LESS_THAN (-1)
 #define ORDO_GREATER_THAN (1)
@@ -43,7 +43,11 @@ static inline unsigned long ordo_get_clock(void)
 {
 	/* rdtscp() is a serializing variant, which is not
 	 * reordered in an instruction pipeline. */
-	return read_tscp();
+  #ifdef HW_lucoms
+  return rdtscp();
+  #else
+  return rdtsc_serialized();
+  #endif
 }
 
 static inline unsigned long ordo_get_clock_relaxed(void)
@@ -53,7 +57,7 @@ static inline unsigned long ordo_get_clock_relaxed(void)
 	 * If rdtsc() can be barrier-ed with other instructions,
 	 * such as memory fences, it is okay to use rdtsc()
 	 * without worrying such reordering. */
-	return read_tsc();
+  return rdtsc();
 }
 
 static inline int ordo_lt_clock(unsigned long t1, unsigned long t2)
