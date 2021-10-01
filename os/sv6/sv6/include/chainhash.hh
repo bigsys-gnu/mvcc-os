@@ -228,6 +228,21 @@ public:
     return killed;
   }
 
+  template<class CB>
+  void enumerate(CB cb) const {
+    scoped_gc_epoch rcu_read;
+
+    for (u64 i = 0; i < nbuckets_; i++) {
+      bucket* b = &buckets_[i];
+
+      for (const item& i: b->chain) {
+        V val = *seq_reader<V>(&i.val, &i.seq);
+        if (cb(i.key, val))
+          return;
+      }
+    }
+  }
+
   bool killed() const {
     return dead_;
   }

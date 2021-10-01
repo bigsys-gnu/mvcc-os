@@ -79,8 +79,11 @@ OBJS = \
 	heapprof.o \
 	eager_refcache.o \
 	disk.o \
+	sysbench.o\
 
 OBJS := $(addprefix $(O)/kernel/, $(OBJS))
+
+include kernel/Makefrag.mvrlu
 
 OBJS += $(CXXRUNTIME)
 
@@ -91,8 +94,8 @@ include kernel/Makefrag.acpica
 KERN = $(O)/kernel.elf
 ALL += $(KERN)
 
-$(O)/kernel/%.o: CFLAGS+=-mcmodel=kernel -DXV6_KERNEL -mno-sse
-$(O)/kernel/%.o: CXXFLAGS+=-mcmodel=kernel -DXV6_KERNEL -mno-sse
+$(O)/kernel/%.o: CFLAGS+=-mcmodel=kernel -DXV6_KERNEL -mno-sse -D__KERNEL__
+$(O)/kernel/%.o: CXXFLAGS+=-mcmodel=kernel -DXV6_KERNEL -mno-sse -D__KERNEL__
 
 $(KERN): $(O)/kernel/boot.o $(OBJS) $(LDEPS) kernel/kernel.ld
 	@echo "  LD     $@"
