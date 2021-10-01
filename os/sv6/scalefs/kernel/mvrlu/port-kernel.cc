@@ -9,7 +9,7 @@
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
 
-#ifdef SPINLOCK_DEBUG
+#if SPINLOCK_DEBUG
 #define lock_print(lock)\
   cprintf("%s (%d): in %s name: %s\n",          \
           myproc()->name, myproc()->pid,        \
