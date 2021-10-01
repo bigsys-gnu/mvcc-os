@@ -114,28 +114,14 @@ static inline void __attribute__((__always_inline__)) smp_wmb_tso(void)
 
 #define cpu_relax() __asm__ volatile("pause\n" : : : "memory")
 
-/* static inline uint64_t __attribute__((__always_inline__)) read_tsc(void) */
+/* static inline void cpuid(int i, unsigned int *a, unsigned int *b, */
+/* 			 unsigned int *c, unsigned int *d) */
 /* { */
-/* 	uint32_t a, d; */
-/* 	__asm __volatile("rdtsc" : "=a"(a), "=d"(d)); */
-/* 	return ((uint64_t)a) | (((uint64_t)d) << 32); */
+/* 	/\* https://bit.ly/2uGziVO *\/ */
+/* 	__asm __volatile("cpuid" */
+/* 			 : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d) */
+/* 			 : "a"(i), "c"(0)); */
 /* } */
-
-/* static inline uint64_t __attribute__((__always_inline__)) read_tscp(void) */
-/* { */
-/* 	uint32_t a, d; */
-/* 	__asm __volatile("rdtscp" : "=a"(a), "=d"(d)); */
-/* 	return ((uint64_t)a) | (((uint64_t)d) << 32); */
-/* } */
-
-static inline void cpuid(int i, unsigned int *a, unsigned int *b,
-			 unsigned int *c, unsigned int *d)
-{
-	/* https://bit.ly/2uGziVO */
-	__asm __volatile("cpuid"
-			 : "=a"(*a), "=b"(*b), "=c"(*c), "=d"(*d)
-			 : "a"(i), "c"(0));
-}
 
 #ifdef __cplusplus
 }
