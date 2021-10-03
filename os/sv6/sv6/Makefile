@@ -207,7 +207,7 @@ QEMUOPTS += -smp $(QEMUSMP) -m $(QEMUMEM) \
 	$(if $(QEMUOUTPUT),-serial file:$(QEMUOUTPUT),-serial mon:stdio) \
 	-nographic \
 	-numa node -numa node \
-	-net user,hostfwd=tcp::2323-:23 -net nic,model=e1000 \
+	-net user,hostfwd=tcp::2323-:23,hostfwd=tcp::8080-:80 -net nic,model=e1000 \
 	$(if $(QEMUNOREDIR),,-redir tcp:2323::23 -redir tcp:8080::80) \
 	$(if $(QEMUAPPEND),-append "$(QEMUAPPEND)",) \
 
