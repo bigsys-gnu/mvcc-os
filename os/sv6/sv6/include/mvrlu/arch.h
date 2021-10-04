@@ -6,8 +6,8 @@ extern "C" {
 #endif
 
 #ifndef __KERNEL__
-#include <stdio.h>
-#include <stdlib.h>
+//#include <stdio.h>
+//#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -15,6 +15,7 @@ extern "C" {
 #include <time.h>
 #include <errno.h>
 #endif
+#include "amd64.h"
 
 #ifndef likely
 #define likely(x) __builtin_expect((unsigned long)(x), 1)

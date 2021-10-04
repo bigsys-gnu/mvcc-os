@@ -64,6 +64,11 @@ UPROGS_BIN= \
 	mail-deliver \
 	disktest \
 	dd \
+	hlbench_mvrlu\
+	hlbench_rlu\
+	hlbench_rcu\
+	hlbench_spin\
+	kbench\
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \
