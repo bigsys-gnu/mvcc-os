@@ -37,66 +37,70 @@ usage(const char *argv0)
 int
 main(int argc, char **argv)
 {
-    printf("kernel lavel benchmark start\n");
-	int n_buckets = DEFAULT_BUCKETS;
-	int initial = DEFAULT_INITIAL;
-	int nb_threads = DEFAULT_NB_THREADS;
-	int duration = DEFAULT_DURATION;
-	int update = DEFAULT_UPDATE;
-    int type = SPINLOCK;
+  printf("kernel lavel benchmark start\n");
+  int n_buckets = DEFAULT_BUCKETS;
+  int initial = DEFAULT_INITIAL;
+  int nb_threads = DEFAULT_NB_THREADS;
+  int duration = DEFAULT_DURATION;
+  int update = DEFAULT_UPDATE;
+  int type = SPINLOCK;
+  int range = DEFAULT_RANGE;
 
-    int opt;
-    while ((opt = getopt(argc, argv, "b:i:t:d:u:s:")) != -1)
+  int opt;
+  while ((opt = getopt(argc, argv, "b:i:t:d:u:s:r:")) != -1)
+  {
+    switch (opt)
     {
-        switch (opt)
-        {
-        case 's':
-            type = atoi(optarg);
-            break;
-        case 'u':
-            update = atoi(optarg);
-            break;
-        case 'd':
-            duration = atoi(optarg);
-            break;
-        case 't':
-            nb_threads = atoi(optarg);
-            break;
-        case 'i':
-            initial = atoi(optarg);
-            break;
-        case 'b':
-            n_buckets = atoi(optarg);
-            break;
-        default:
-            usage(argv[0]);
-        }
+    case 's':
+      type = atoi(optarg);
+      break;
+    case 'u':
+      update = atoi(optarg);
+      break;
+    case 'd':
+      duration = atoi(optarg);
+      break;
+    case 't':
+      nb_threads = atoi(optarg);
+      break;
+    case 'i':
+      initial = atoi(optarg);
+      break;
+    case 'b':
+      n_buckets = atoi(optarg);
+      break;
+    case 'r':
+      range = atoi(optarg);
+      break;
+    default:
+      usage(argv[0]);
     }
+  }
 
-	assert(n_buckets >= 1);
-	assert(duration >= 0);
-	assert(initial >= 0);
-	assert(nb_threads > 0);
-	assert(update >= 0 && update <= 1000);
-	// assert(range > 0 && range >= initial);
-    // assert(n_buckets < range);
+  assert(n_buckets >= 1);
+  assert(duration >= 0);
+  assert(initial >= 0);
+  assert(nb_threads > 0);
+  assert(update >= 0 && update <= 1000);
+  // assert(range > 0 && range >= initial);
+  // assert(n_buckets < range);
 
-    printf("-t #threads     : %d\n", nb_threads);
-    printf("-i Initial size : %d\n", initial);
-    printf("-b Buckets      : %d\n", n_buckets);
-    printf("-d Duration     : %d\n", duration);
-    printf("-u Update rate  : %d\n", update);
-    printf("-s sync type    : %d\n", type);
-    printf("Benchmark type  : hash-list\n");
+  printf("-t #threads     : %d\n", nb_threads);
+  printf("-i Initial size : %d\n", initial);
+  printf("-b Buckets      : %d\n", n_buckets);
+  printf("-d Duration     : %d\n", duration);
+  printf("-u Update rate  : %d\n", update);
+  printf("-s sync type    : %d\n", type);
+  printf("Benchmark type  : hash-list\n");
 
 
-    benchmark(
-        nb_threads,
-        initial,
-        n_buckets,
-        duration,
-        update,
-        type);
+  benchmark(
+    nb_threads,
+    initial,
+    n_buckets,
+    duration,
+    update,
+    type);
 
-    return 1;
+  return 1;
 }
