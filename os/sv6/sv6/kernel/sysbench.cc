@@ -13,26 +13,28 @@
 #include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
 #include "chainhash.hh"
+#include "mvcc_kernel_bench.h"
 #include "mvrlu/mvrlu.h"
+
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
 #include <uk/unistd.h>
 
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
-#define PRINT_BENCH(BENCH) cprintf("************" #BENCH "***************\n")
 template <typename T>
 struct thread_param;
 
 template <typename T>
-void bench(int nb_threads, int initial, int n_buckets, int duration, int update, int range);
+void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
+           int range, kernel_bench_outcome *out);
 
 template <typename T>
 struct hash_list;
 
 template <typename T>
 void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[],
-                   int nb_threads, int initial, int duration);
+                   int nb_threads, int initial, int duration, kernel_bench_outcome*);
 
 void sleep_usec(u64 initial_time, u64 usec);
 
@@ -61,7 +63,6 @@ enum sync_type {
   SPINLOCK = 0,
   MVRLU = 1,
   RCU = 2,
-  SPIN_CHAIN = 3
 };
 //////////////////////////////////////
 // RANDOM FUNCTIONS
@@ -665,9 +666,10 @@ void test<mvrlu_bench>(void *param) {
 //////////////////////////////////////
 // MVRLU FINISH
 /////////////////////////////////////
+
 template <typename T>
 void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
-           int range)
+           int range, kernel_bench_outcome *out)
 {
   bench_init<T>();
 
@@ -721,7 +723,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   bench_finish<T>();
   cprintf(" done!\n");
 
-  print_outcome<T>(*hl, param_list, nb_threads, initial, duration);
+  print_outcome<T>(*hl, param_list, nb_threads, initial, duration, out);
 
   // deallocate memory
   delete hl;
@@ -735,32 +737,40 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 
 //SYSCALL
 void
-sys_benchmark(int nb_threads, int initial, int n_buckets, int duration, int update,
-              int sync_type)
+sys_benchmark(void *arguments, void *retptr)
 {
-  enum sync_type type = (enum sync_type) sync_type;
+  assert(arguments != nullptr);
+  assert(retptr != nullptr);
+
+  kernel_bench_args *args = reinterpret_cast<kernel_bench_args *>(arguments);
+  int nb_threads = args->nb_threads;
+  int initial = args->initial;
+  int n_buckets = args->n_buckets;
+  int duration = args->duration;
+  int update = args->update;
+  int range = args->range;
+  enum sync_type type = (enum sync_type) args->sync_type;
   cprintf("Run Kernel Level Benchmark\n");
-  int range = initial * 2;
 
   assert(n_buckets >= 1);
   assert(duration >= 0);
   assert(initial >= 0);
   assert(nb_threads > 0);
   assert(update >= 0 && update <= 1000);
-  // assert(range > 0 && range >= initial);
+  assert(range > 0 && range >= initial);
 
   switch (type) {
   case SPINLOCK:
-    bench<spinlock_bench>(nb_threads, initial, n_buckets, duration, update, range);
-    PRINT_BENCH(SPINLOCK);
+    bench<spinlock_bench>(nb_threads, initial, n_buckets, duration,
+                          update, range, reinterpret_cast<kernel_bench_outcome *>(retptr));
     break;
   case MVRLU:
-    bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration, update, range);
-    PRINT_BENCH(MVRLU);
+    bench<mvrlu_bench>(nb_threads, initial, n_buckets, duration,
+                          update, range, reinterpret_cast<kernel_bench_outcome *>(retptr));
     break;
   case RCU:
-    bench<rcu_bench>(nb_threads, initial, n_buckets, duration, update, range);
-    PRINT_BENCH(RCU);
+    bench<rcu_bench>(nb_threads, initial, n_buckets, duration,
+                          update, range, reinterpret_cast<kernel_bench_outcome *>(retptr));
     break;
   default:
     cprintf("Wrong sync type! 0:spinlock 1:mvrlu 2:rcu+seqlock\n");
@@ -784,7 +794,8 @@ void sleep_usec(u64 initial_time, u64 usec) {
 
 template <typename T>
 void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[],
-                   int nb_threads, int initial, int duration) {
+                   int nb_threads, int initial, int duration,
+                   kernel_bench_outcome *retptr) {
   unsigned long reads = 0, updates = 0, total_variation = 0;
 
   for (int i = 0; i < nb_threads; i++)
@@ -801,19 +812,9 @@ void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[]
   unsigned long total_size = hl.get_total_node_num();
 
   unsigned long exp = initial + total_variation;
-  cprintf( "\n#### B ####\n");
 
-  cprintf( "Set size      : %lu (expected: %lu)\n", total_size, exp);
-  cprintf( "Duration      : %d (ms)\n", duration);
-  unsigned long iv = reads * 1000.0 / duration;
-  unsigned long fv = (unsigned long)(reads * 1000.0 / duration * 10) % 10;
-  cprintf( "#read ops     : %lu (%lu.%lu / s)\n", reads, iv, fv);
-  iv = updates * 1000.0 / duration;
-  fv = (unsigned long)(updates * 1000.0 / duration * 10) % 10;
-  cprintf( "#update ops   : %lu (%lu.%lu / s)\n", updates, iv, fv);
-
-  if(exp != total_size)
-  {
-    cprintf("\n<<<<<< ASSERT FAILURE(%lu!=%lu) <<<<<<<<\n", exp, total_size);
-  }
+  retptr->total_size = total_size;
+  retptr->exp = exp;
+  retptr->total_read = reads;
+  retptr->total_update = updates;
 }

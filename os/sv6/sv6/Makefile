@@ -24,8 +24,6 @@ MTRACESRC  ?= ../mtrace
 # Mtrace-enabled QEMU binary
 MTRACE     ?= $(MTRACESRC)/x86_64-softmmu/qemu-system-x86_64
 
-QEMUNOREDIR ?= 1
-
 O           = o.$(HW)
 
 ifeq ($(HW),linux)
@@ -207,8 +205,7 @@ QEMUOPTS += -smp $(QEMUSMP) -m $(QEMUMEM) \
 	$(if $(QEMUOUTPUT),-serial file:$(QEMUOUTPUT),-serial mon:stdio) \
 	-nographic \
 	-numa node -numa node \
-	-net user -net nic,model=e1000 \
-	$(if $(QEMUNOREDIR),,-redir tcp:2323::23 -redir tcp:8080::80) \
+	-net user,hostfwd=tcp::2323-:23,hostfwd=tcp::8080-:80 -net nic,model=e1000 \
 	$(if $(QEMUAPPEND),-append "$(QEMUAPPEND)",) \
 
 ## One NUMA node per CPU when mtrace'ing
