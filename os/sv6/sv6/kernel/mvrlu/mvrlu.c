@@ -1679,6 +1679,9 @@ void mvrlu_print_stats(void)
 	printf("-------------------------------------------------\n");
 	stat_print_cnt(&g_stat);
 	printf("-------------------------------------------------\n");
+#ifdef __KERNEL__
+    memset(&g_stat, 0, sizeof(g_stat));
+#endif
 #endif
 }
 

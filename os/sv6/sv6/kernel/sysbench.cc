@@ -14,6 +14,8 @@
 #include "mvrlu/mvrlu.hpp"
 #include "chainhash.hh"
 #include "mvcc_kernel_bench.h"
+#include "mvrlu/mvrlu.h"
+
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
@@ -609,6 +611,7 @@ void bench_init<mvrlu_bench>(void) {
 template <>
 void bench_finish<mvrlu_bench>(void) {
   mvrlu_finish();
+  mvrlu_print_stats();
 }
 
 template <>

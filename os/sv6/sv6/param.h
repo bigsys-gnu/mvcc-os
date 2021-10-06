@@ -87,6 +87,11 @@
 //
 // Physical hardware targets
 //
+#elif defined(HW_lucoms)
+#define DEBUG         0
+#define NCPU          16  // maximum number of CPUs
+#define NSOCKET       1
+#define PERFSIZE      (128<<20ull)
 #elif defined(HW_josmp)
 #define DEBUG         0
 #define NCPU          16  // maximum number of CPUs
