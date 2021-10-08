@@ -1,6 +1,6 @@
 #pragma once
 
-#include "mvrlu/mvrlu.hpp"
+#include "mvrlu/mvrlu.hh"
 #include "cpu.hh"
 #include "proc.hh"
 
@@ -64,7 +64,10 @@ namespace mvrlu {
     try_lock(void)
     {
       auto &h = *myproc()->handle;
-      return h.mvrlu_try_lock(&ptr_);
+      bool ret = h.mvrlu_try_lock(&ptr_);
+      if (!ret)
+        h.mvrlu_abort();
+      return ret;
     }
 
     bool
