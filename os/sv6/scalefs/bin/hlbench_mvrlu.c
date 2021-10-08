@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <pthread.h>
 #include <unistd.h>
+#include <time.h>
 #include "user.h"
 #include "mvrlu/mvrlu.h"
 #include "mvrlu/mvrlu_i.h"

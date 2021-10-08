@@ -8,6 +8,8 @@
 #define printf(...)\
   port_print_str(__VA_ARGS__)
 #else
+#include <stdio.h>
+#include <stdlib.h>
 #include "mvrlu/port-user.h"
 #endif
 
