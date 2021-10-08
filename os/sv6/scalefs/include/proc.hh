@@ -9,7 +9,7 @@
 #include "ilist.hh"
 #include <stdexcept>
 #include "vmalloc.hh"
-#include "mvrlu/mvrlu.hpp"
+#include "mvrlu/mvrlu.hh"
 
 struct pgmap;
 struct gc_handle;

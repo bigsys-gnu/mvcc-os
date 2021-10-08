@@ -11,7 +11,7 @@
 #include "futex.h"
 #include "version.hh"
 #include "filetable.hh"
-#include "mvrlu/mvrlu.hpp"
+#include "mvrlu/mvrlu.hh"
 #include "chainhash.hh"
 #include "chainhash_spinlock.hh"
 
@@ -530,25 +530,7 @@ struct mvrlu_node {
 
   mvrlu_node(int val): value(val), next(NULL) {}
 
-  static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
-    return mvrlu::mvrlu_alloc<mvrlu_node>();
-  }
-
-  static void* operator new(unsigned long nbytes) {
-    void *p = mvrlu_node::operator new(nbytes, std::nothrow);
-    if (p == nullptr)
-      throw_bad_alloc();
-    return p;
-  }
-
-  static void operator delete(void *p, const std::nothrow_t&) noexcept {
-    mvrlu::mvrlu_free(p);
-  }
-
-  static void operator delete(void *p) {
-    mvrlu_node::operator delete(p, std::nothrow);
-  }
-
+  MVRLU_NEW_DELETE(mvrlu_node);
 };
 
 template <>

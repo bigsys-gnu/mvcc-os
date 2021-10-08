@@ -6,6 +6,29 @@
 #include "mvrlu/port-kernel.h"
 #include <cstddef>
 
+#define MVRLU_NEW_DELETE(CLASS_NAME)                                    \
+  static void*                                                          \
+  operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {  \
+    return mvrlu::mvrlu_alloc<CLASS_NAME>();                            \
+  }                                                                     \
+  static void*                                                          \
+  operator new(unsigned long nbytes) {                                  \
+    void *p = CLASS_NAME::operator new(nbytes, std::nothrow);           \
+    if (p == nullptr)                                                   \
+      throw_bad_alloc();                                                \
+    return p;                                                           \
+  }                                                                     \
+  static void                                                           \
+  operator delete(void *p, const std::nothrow_t&) noexcept {            \
+    mvrlu::mvrlu_free(p);                                               \
+  }                                                                     \
+                                                                        \
+  static void                                                           \
+  operator delete(void *p) {                                            \
+    CLASS_NAME::operator delete(p, std::nothrow);                       \
+  }
+
+
 namespace mvrlu {
   class thread_handle;
 
