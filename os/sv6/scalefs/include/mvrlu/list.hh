@@ -74,7 +74,10 @@ namespace mvrlu {
     try_lock_const(void)
     {
       auto &h = *myproc()->handle;
-      return h.mvrlu_try_lock_const(ptr_);
+      bool ret = h.mvrlu_try_lock_const(ptr_);
+      if (!ret)
+        h.mvrlu_abort();
+      return ret;
     }
 
     T &
