@@ -5,6 +5,8 @@
 #include "cpputil.hh"
 #include "mvrlu/port-kernel.h"
 #include <cstddef>
+#include "proc.hh"
+#include "cpu.hh"
 
 #define MVRLU_NEW_DELETE(CLASS_NAME)                                    \
   static void*                                                          \
@@ -138,6 +140,18 @@ namespace mvrlu {
 
   private:
     mvrlu_thread_struct_t self_;
+  };
+  
+  class mvrlu_section {
+  public:
+    mvrlu_section(void)
+    {
+      myproc()->handle->mvrlu_reader_lock();
+    }
+    ~mvrlu_section(void)
+    {
+      myproc()->handle->mvrlu_reader_unlock();
+    }
   };
 
 }
