@@ -31,6 +31,17 @@ namespace mvrlu {
       return link(next);
     }
 
+    T*
+    operator->(void)
+    {
+      return next;
+    }
+
+    T&
+    operator*(void)
+    {
+      return *next;
+    }
   };
 
   template <typename T, link<T> T::* L>
@@ -136,7 +147,6 @@ namespace mvrlu {
     {
       return ptr_;
     }
-    // need to add mvrlu_free!
   };
 
   template <typename T, link<T> T::* L>
