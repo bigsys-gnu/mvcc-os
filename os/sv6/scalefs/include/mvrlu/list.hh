@@ -1,6 +1,7 @@
 #pragma once
 
 #include "mvrlu/mvrlu.hh"
+#include "kernel.hh"
 #include "cpu.hh"
 #include "proc.hh"
 
@@ -164,7 +165,8 @@ namespace mvrlu {
 
     list(void) {
       // this can cause a lot of memory waste
-      head_.next = new T();
+      head_.next = (T*)kmalloc(sizeof(T), "mvrlu");
+      head_.next->*L = nullptr;
     }
 
     list(const list &o) = delete;
