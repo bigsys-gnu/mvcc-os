@@ -9,6 +9,7 @@
 #include "cpuid.hh"
 #include "mvrlu/mvrlu.hh"
 #include "mvrlu/list.hh"
+#include "mvrlu/section.hh"
 
 /*
  * MV-RLU manages only pure value
@@ -62,7 +63,6 @@ namespace mvrlu {
     NEW_DELETE_OPS(chainhash);
 
     bool insert(const K& k, const V& v, u64 *tsc = NULL) {
-      auto &h = *myproc()->handle;
       bucket* b = &buckets_[hash(k) % nbuckets_];
 
     restart:
