@@ -21,5 +21,5 @@
 #define MVRLU_DEFAULT_PADDING CACHE_DEFAULT_PADDING
 #include "arch.h"
 //#define MVRLU_NESTED_LOCKING
-/* #define MVRLU_ENABLE_STATS */
+#define MVRLU_ENABLE_STATS
 #endif /* _CONFIG_H */

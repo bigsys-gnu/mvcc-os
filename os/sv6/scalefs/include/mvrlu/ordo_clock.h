@@ -13,8 +13,9 @@ extern "C" {
 
 /* ORDO boundary of our evaluation set up
  * 224-core machine: 1214 clock cycles
- * 120-core machine: 650 clock cycles */
-#define __ORDO_BOUNDARY (174)
+ * 120-core machine: 650 clock cycles 
+ * Lucoms(16-core) : 152 clock cycles */
+#define __ORDO_BOUNDARY (152)
 
 #ifdef ORDO_CONFIGURABLE_BOUNDARY
 /* Since clock difference is a read-mostly variable that is never
