@@ -52,7 +52,7 @@ namespace mvrlu {
   }
 
   template <typename T>
-  inline void *
+  inline T *
   mvrlu_alloc(void) {
     return (T *) ::mvrlu_alloc(sizeof(T));
   }

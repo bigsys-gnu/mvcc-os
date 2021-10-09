@@ -165,7 +165,7 @@ namespace mvrlu {
 
     list(void) {
       // this can cause a lot of memory waste
-      head_.next = (T*)kmalloc(sizeof(T), "mvrlu");
+      head_.next = mvrlu_alloc<T>();
       (head_.next->*L).next = nullptr;
     }
 
