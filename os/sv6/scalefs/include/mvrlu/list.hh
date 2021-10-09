@@ -58,7 +58,7 @@ namespace mvrlu {
     }
     iter(T *ptr) {
       auto &h = *myproc()->handle;
-      ptr_ = h.mvrlu_deref(ptr_);
+      ptr_ = h.mvrlu_deref(ptr);
     }
 
     bool
