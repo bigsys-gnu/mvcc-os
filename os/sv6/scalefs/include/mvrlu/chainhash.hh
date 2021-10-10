@@ -67,19 +67,23 @@ namespace mvrlu {
 
     restart:
       mvrlu_section s;
-      for (const item& i: b->chain)
-        if (i.key == k)
+
+      for (auto it = b->chain.begin(); it != b->chain.end(); it++)
+      {
+        if (it->key > k)
+          continue;
+        else if (it->key < k)
+        {
+          if (!it.try_lock())
+            goto restart;
+          b->chain.insert_after(it, new item(k, v));
+          if (tsc)
+            *tsc = get_tsc();
+          return true;
+        }
+        else                    // same key is exist!
           return false;
-
-      auto head = b->chain.before_begin();
-      if (!head.try_lock())
-        goto restart;
-
-      b->chain.insert_after(head, new item(k, v));
-
-      if (tsc)
-        *tsc = get_tsc();
-      return true;
+      }
     }
 
     bool remove(const K& k, const V& v, u64 *tsc = NULL) {
