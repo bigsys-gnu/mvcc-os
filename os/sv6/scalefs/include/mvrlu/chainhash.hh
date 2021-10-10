@@ -67,7 +67,6 @@ namespace mvrlu {
 
     restart:
       mvrlu_section s;
-
       for (auto it = b->chain.begin(); it != b->chain.end(); it++)
       {
         if (it->key > k)
@@ -84,6 +83,14 @@ namespace mvrlu {
         else                    // same key is exist!
           return false;
       }
+      // bucket is empty!
+      auto it = b->chain.before_begin();
+      if (!it.try_lock())       // lock the object
+        goto restart;
+      b->chain.insert_after(it, new item(k, v));
+      if (tsc)
+        *tsc = get_tsc();
+      return true;
     }
 
     bool remove(const K& k, const V& v, u64 *tsc = NULL) {
