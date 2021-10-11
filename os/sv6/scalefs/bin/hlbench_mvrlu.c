@@ -51,11 +51,11 @@ static inline int rand_range(int n, unsigned short *seed)
 
 typedef struct node {
   int value;
-  struct node *p_next;
+  struct node *next;
 } node_t;
 
 typedef struct list {
-  node_t *p_head;
+  node_t *head;
 } list_t;
 
 typedef struct hash_list {
@@ -88,21 +88,22 @@ int duration = DEFAULT_DURATION;
 int update = DEFAULT_UPDATE;
 int range = DEFAULT_RANGE;
 
-int raw_list_insert(int key, list_t *p_list)
+int
+raw_list_insert(int key, list_t *list)
 {
   node_t *prev, *cur, *new_node;
   int ret = 0;
 
-  for (prev = p_list->p_head, cur = prev->p_next; cur != NULL;
-       prev = cur, cur = cur->p_next)
+  for (prev = list->head, cur = prev->next; cur != NULL;
+       prev = cur, cur = cur->next)
   {
     if (key < cur->value)
     {
       ret = 1;
       new_node = RLU_ALLOC(sizeof(node_t));
       new_node->value = key;
-      new_node->p_next = cur;
-      prev->p_next = new_node;
+      new_node->next = cur;
+      prev->next = new_node;
       return ret;
     }
     else if (key == cur->value)
@@ -114,221 +115,166 @@ int raw_list_insert(int key, list_t *p_list)
       ret = 1;
       new_node = RLU_ALLOC(sizeof(node_t));
       new_node->value = key;
-      new_node->p_next = cur;
-      prev->p_next = new_node;
+      new_node->next = cur;
+      prev->next = new_node;
     }
   return ret;
 }
 
-int list_insert(rlu_thread_data_t *self, int val, list_t *p_list)
+int list_insert(rlu_thread_data_t *self, int key, list_t *list)
 {
-    int result;
-    node_t *p_prev, *p_next;
-    int v;
+  node_t *prev, *cur, *new_node;
+  int ret = 0;
 
-restart:
-    RLU_READER_LOCK(self);
-    
-    p_prev = (node_t *)RLU_DEREF(self, (p_list->p_head));
-    p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
+ restart:
+  RLU_READER_LOCK(self);
 
-    if (p_prev == NULL || p_next == NULL) {
-        printf("NULL from RLU_DEREF");
-        exit(1);
-    }
-
-    while(1) {
-        v = p_next->value;
-
-        if (v >= val)
-            break;
-        
-        p_prev = p_next;
-        p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
-    }
-
-    result = (v != val);
-
-    if (result) {
-        /* try to get locks */
-        if (!RLU_TRY_LOCK(self, &p_prev)) {
+  for (prev = (node_t *)RLU_DEREF(self, list->head), cur = (node_t *)RLU_DEREF(self, prev->next); ;
+	   prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
+    {
+      if (cur == NULL || cur->value > key)
+        {
+          /* get the lock */
+          if (!RLU_TRY_LOCK(self, &prev))
+            {
               RLU_ABORT(self);
               goto restart;
+            }
+          /* initialize node */
+          new_node = (node_t *) RLU_ALLOC(sizeof(node_t));
+          new_node->value = key;
+
+          /* insert node */
+          RLU_ASSIGN_PTR(self, &new_node->next, prev->next);
+          RLU_ASSIGN_PTR(self, &prev->next, new_node);
+          ret = 1;
+		      break;
         }
-        if (!RLU_TRY_LOCK(self, &p_next)) {
+      else if (cur->value == key)
+      {
+        break;             /* the key value already exists. */
+      }
+    }
+
+  RLU_READER_UNLOCK(self);
+  return ret;
+}
+
+int list_delete(rlu_thread_data_t *self, int key, list_t *list)
+{
+  node_t *prev, *cur, *cur_n;
+  int ret = 0;
+
+ restart:
+  RLU_READER_LOCK(self);
+
+  for (prev = (node_t *)RLU_DEREF(self, list->head), cur = (node_t *)RLU_DEREF(self, prev->next);
+       cur != NULL; prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
+    {
+      /* found the target to be trashed. */
+      if (cur->value == key)
+        {
+          /* try lock */
+          if (!RLU_TRY_LOCK(self, &prev) ||
+			  !RLU_TRY_LOCK_CONST(self, cur))
+            {
               RLU_ABORT(self);
               goto restart;
+            }
+		  cur_n = (node_t *)RLU_DEREF(self, cur->next);
+          RLU_ASSIGN_PTR(self, &prev->next, cur_n);
+          RLU_FREE(self, cur);
+          ret = 1;
+          break;
         }
-
-        /* initialize node */
-        node_t *p_new_node = (node_t *) RLU_ALLOC(sizeof(node_t));
-        p_new_node->value = val;
-
-        /* insert node */
-        RLU_ASSIGN_PTR(self, &(p_new_node->p_next), p_next);
-        RLU_ASSIGN_PTR(self, &(p_prev->p_next), p_new_node);
     }
 
-    RLU_READER_UNLOCK(self);
-
-    return result;
+  RLU_READER_UNLOCK(self);
+  return ret;
 }
 
-int list_delete(rlu_thread_data_t *self, int val, list_t *p_list)
+int list_find(rlu_thread_data_t *self, int key, list_t *list)
 {
-    int result;
-    node_t *p_prev, *p_next;
-    node_t *n;
-    int v;
+  node_t *cur;
+  int value = -1;
 
-restart:
-    RLU_READER_LOCK(self);
-    
-    p_prev = (node_t *)RLU_DEREF(self, (p_list->p_head));
-    p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
+  RLU_READER_LOCK(self);
 
-    while(1) {
-        //p_node = (node_t *)RLU_DEREF(self, p_next);
-        v = p_next->value;
+  cur = (node_t *)RLU_DEREF(self, list->head);
 
-        if (v >= val) 
-               break;
-    
-        p_prev = p_next;
-        p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
-    }
+  while(cur && cur->value < key)
+  {
+	cur = (node_t *)RLU_DEREF(self, cur->next);
+  }
 
-    result = (v == val);
+  /* found the value. */
+  if (cur && cur->value == key)
+	{
+	  value = cur->value;
+	}
 
-    if (result) {
-        n = (node_t *)RLU_DEREF(self, (p_next->p_next));
-
-        if (!RLU_TRY_LOCK(self, &p_prev)) {
-            RLU_ABORT(self);
-            goto restart;
-        }
-        
-        if (!RLU_TRY_LOCK_CONST(self, p_next)) {
-            RLU_ABORT(self);
-            goto restart;
-        }
-
-        RLU_ASSIGN_PTR(self, &(p_prev->p_next), n);
-        RLU_FREE(self, p_next);
-
-        RLU_READER_UNLOCK(self);
-       
-        return result;
-    }
-    
-    RLU_READER_UNLOCK(self);
-
-    return result;
-}
-
-int list_find(rlu_thread_data_t *self, int val, list_t *p_list)
-{
-    int result;
-    int v;
-    node_t *p_prev, *p_next;
-
-    RLU_READER_LOCK(self);
-
-    p_prev = (node_t *)RLU_DEREF(self, (p_list->p_head));
-    p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
-
-    while(1) {
-        v = p_next->value;
-
-        if(v >= val)
-            break;
-    
-        p_prev = p_next;
-        p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
-    }
-
-    result = (v == val);
-
-    RLU_READER_UNLOCK(self);
-   
-    return result;
-}
-
-int list_print_all(rlu_thread_data_t *self, list_t *p_list)
-{
-    int v;
-    node_t *p_prev, *p_next;
-
-    RLU_READER_LOCK(self);
-
-    p_prev = (node_t *)RLU_DEREF(self, (p_list->p_head));
-    p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
-
-    while(1) {
-        v = p_next->value;
-
-        printf("[list_print_all] val:%d\n", v);
-    
-        p_prev = p_next;
-        p_next = (node_t *)RLU_DEREF(self, (p_prev->p_next));
-    }
-
-    RLU_READER_UNLOCK(self);
-   
-    return 0;
+  RLU_READER_UNLOCK(self);
+  return value;
 }
 
 void *test(void* param)
 {
-    int op, bucket, value;
-    value = 1;//sys_uptime();
+  int op, bucket, value;
+  value = 1;//sys_uptime();
 
-    thread_param_t *p_data = (thread_param_t*)param; 
-    hash_list_t *p_hash_list = p_data->p_hash_list;
-    rlu_thread_data_t *self = &p_data->self;
+  thread_param_t *p_data = (thread_param_t*)param; 
+  hash_list_t *p_hash_list = p_data->p_hash_list;
+  rlu_thread_data_t *self = &p_data->self;
 
-    if (setaffinity((p_data->id + 1) % NCPU) < 0)
-    {
-        RLU_THREAD_FINISH(self);
-        RLU_THREAD_FREE(self);
-        die("affinity error");
-    }
-    mvrlu_flush_log(self);
-    pthread_barrier_wait(&bar);
+  if (setaffinity((p_data->id + 1) % NCPU) < 0)
+  {
+    RLU_THREAD_FINISH(self);
+    RLU_THREAD_FREE(self);
+    die("affinity error");
+  }
+  mvrlu_flush_log(self);
+  pthread_barrier_wait(&bar);
 
-    while (*p_data->stop == 0)
+  while (*p_data->stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
       bucket = HASH_VALUE(p_hash_list, value);
       list_t *p_list = p_hash_list->buckets[bucket];
 
-   //   printf("update:%d op:%d value:%d bucket:%d \n", p_data->update, op, value, bucket);
-
-      if (op < p_data->update) {
-          if ((op & 0x01) == 0) {
-              if (list_insert(self, value, p_list)) {
+      if (op < p_data->update)
+        {
+          if ((op & 0x01) == 0)
+            {
+              if (list_insert(self, value, p_list))
+                {
                   p_data->variation++;
-              }
+                }
               p_data->result_add++;
-          } else {
-              if (list_delete(self, value, p_list)) {
+            }
+          else
+            {
+              if (list_delete(self, value, p_list))
+                {
                   p_data->variation--;
-              }
+                }
               p_data->result_remove++;
-          }
-      } else {
-            if(list_find(self, value, p_list) >= 0) {
+            }
+        }
+      else
+        {
+          if(list_find(self, value, p_list) >= 0)
+            {
               p_data->result_found++;
             }
-            p_data->result_contains++;
-      }
+          p_data->result_contains++;
+        }
     }
 
-    RLU_THREAD_FINISH(self);
-    RLU_THREAD_FREE(self);
-    printf("thread %d end\n", p_data->id);
-    return NULL;
+  RLU_THREAD_FINISH(self);
+  RLU_THREAD_FREE(self);
+  printf("thread %d end\n", p_data->id);
+  return NULL;
 }
 
 int main(int argc, char **argv)
@@ -365,7 +311,7 @@ int main(int argc, char **argv)
       printf("%d Option is inserted\n", argc - 1);
       break;
     }
-  printf("\n#### Chained hash table for MV-RLU user-level ####\n");
+  printf("\n#### mvcc bench ####\n");
   printf( "-Nb threads   : %d\n", nb_threads);
   printf( "-Initial size : %d\n", initial);
   printf( "-Buckets      : %d\n", n_buckets);
@@ -395,8 +341,8 @@ int main(int argc, char **argv)
       printf("list init error\n");
       exit(1);
     }
-    list->p_head = RLU_ALLOC(sizeof(node_t));
-    list->p_head->p_next = NULL;
+    list->head = RLU_ALLOC(sizeof(node_t));
+    list->head->next = NULL;
     p_hash_list->buckets[i] = list;
   }
 
@@ -470,19 +416,17 @@ int main(int argc, char **argv)
     total_variation += param_list[i].variation;
   }
 
-    printf("#1\n");
-    RLU_FINISH();
-    printf("#2\n");
+  RLU_FINISH();
 
   RLU_PRINT_STATS();
 
   total_size = 0;
   for(i = 0; i < n_buckets; i++)
     {
-      node_t *node = p_hash_list->buckets[i]->p_head->p_next;
+      node_t *node = p_hash_list->buckets[i]->head->next;
       while(node != NULL)
         {
-          node = node->p_next;
+          node = node->next;
           total_size++;
         }
     }
