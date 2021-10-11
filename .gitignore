@@ -10,7 +10,7 @@ __*.txt
 *.pyc
 
 .DS_Store
-
+o.*
 
 sync/bin
 os/Xv6-kernel-threads/bootother
