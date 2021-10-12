@@ -94,9 +94,6 @@ namespace mvrlu {
     }
 
     bool remove(const K& k, const V& v, u64 *tsc = NULL) {
-      if (!lookup(k))
-        return false;
-
       auto &h = *myproc()->handle;
       bucket *b = &buckets_[hash(k) % nbuckets_];
 
@@ -125,9 +122,6 @@ namespace mvrlu {
     }
 
     bool remove(const K& k, u64 *tsc = NULL) {
-      if (!lookup(k))
-        return false;
-
       auto &h = *myproc()->handle;
       bucket* b = &buckets_[hash(k) % nbuckets_];
 
@@ -191,10 +185,10 @@ namespace mvrlu {
     }
 
     int getSize() {
-      mvrlu_section s;
 
       int size = 0;
 
+      mvrlu_section s;
       for (u64 i = 0; i < nbuckets_; i++) {
         bucket* b = &buckets_[i];
 
@@ -218,14 +212,16 @@ namespace mvrlu {
       mvrlu_section s;
       for (const item& i : b->chain)
       {
-        if (i.key != k)
+        if (i.key < k)
           continue;
+        else if (i.key > k)
+          return false;
         if (vptr)
           *vptr = i.val;
         return true;
       }
       return false;
-    }
+   }
 
   };
 
