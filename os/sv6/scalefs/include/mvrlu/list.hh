@@ -64,6 +64,8 @@ namespace mvrlu {
     bool
     try_lock(void)
     {
+      if (ptr_ == nullptr)
+        return true;
       auto &h = *myproc()->handle;
       bool ret = h.mvrlu_try_lock(&ptr_);
       if (!ret)
@@ -74,6 +76,8 @@ namespace mvrlu {
     bool
     try_lock_const(void)
     {
+      if (ptr_ == nullptr)
+        return true;
       auto &h = *myproc()->handle;
       bool ret = h.mvrlu_try_lock_const(ptr_);
       if (!ret)

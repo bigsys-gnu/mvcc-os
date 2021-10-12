@@ -74,11 +74,8 @@ namespace mvrlu {
         else if (it->key < k)
         {
           auto prev = it++;
-          if (!prev.try_lock())
+          if (!prev.try_lock() || !it.try_lock())
             goto restart;
-          if (it != nullptr)
-            if (!it.try_lock())
-              goto restart;
           auto *node = new item(k, v);
           node->link = it;
           prev->link = node;
