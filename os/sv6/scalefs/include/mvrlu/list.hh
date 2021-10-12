@@ -210,7 +210,7 @@ namespace mvrlu {
     bool
     empty() const noexcept
     {
-      return iterator(head_) == iterator();
+      return begin() == end();
     }
 
     void
