@@ -576,7 +576,8 @@ public:
     {
       if (cur == NULL || cur->value > key)
       {
-        if (!h.mvrlu_try_lock(&prev))
+        if (!h.mvrlu_try_lock(&prev) ||
+            !h.mvrlu_try_lock(&cur))
         {
           h.mvrlu_abort();
           goto restart;

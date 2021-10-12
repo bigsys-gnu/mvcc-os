@@ -75,11 +75,15 @@ namespace mvrlu {
 
     inline bool
     mvrlu_try_lock(T** p_p_obj) {
+      if (!*p_p_obj)
+        return true;
       return ::_mvrlu_try_lock(&self_, (void **)p_p_obj, sizeof(T));
     }
 
     inline bool
     mvrlu_try_lock_const(T* obj) {
+      if (!obj)
+        return true;
       return ::_mvrlu_try_lock_const(&self_, (void *)obj, sizeof(T));
     }
 

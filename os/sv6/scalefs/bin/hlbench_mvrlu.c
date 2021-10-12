@@ -142,6 +142,11 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
               RLU_ABORT(self);
               goto restart;
             }
+          if (cur && !RLU_TRY_LOCK(self, &cur))
+            {
+              RLU_ABORT(self);
+              goto restart;
+            }
           /* initialize node */
           new_node = (node_t *) RLU_ALLOC(sizeof(node_t));
           new_node->value = key;
