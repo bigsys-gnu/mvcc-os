@@ -865,7 +865,7 @@ class mfs_interface
     // A hash-table to track the last transaction(*) that modified a given
     // inode-block or bitmap-block. (* = specifically, which journal's
     // transaction-queue that transaction went into and at what timestamp).
-    chainhash<u32, tx_queue_info> *blocknum_to_queue;
+    mvrlu::chainhash<u32, tx_queue_info> *blocknum_to_queue;
 
     // List of mnums whose mnodes have hit mnode::onzero() and hence their
     // corresponding on-disk inodes can be deleted.
