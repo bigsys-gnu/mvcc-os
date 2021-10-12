@@ -127,26 +127,26 @@ namespace mvrlu {
     }
 
     bool
-    operator==(const T *rhs) const noexcept
+    operator==(T *rhs) const noexcept
     {
       return rhs ?
         mvrlu_cmp_ptrs(ptr_, rhs) : (ptr_ == rhs);
     }
 
     bool
-    operator==(const iter &rhs) const noexcept
+    operator==(iter &rhs) const noexcept
     {
       return rhs.ptr_ ?
         mvrlu_cmp_ptrs(ptr_, rhs.ptr_) : (ptr_ == rhs.ptr_);
     }
 
     bool
-    operator!=(const T *rhs) const noexcept {
+    operator!=(T *rhs) const noexcept {
       return !(*this == rhs);
     }
 
     bool
-    operator!=(const iter &rhs) const noexcept {
+    operator!=(iter &rhs) const noexcept {
       return !(*this == rhs);
     }
 
