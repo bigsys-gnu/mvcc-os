@@ -221,16 +221,16 @@ namespace mvrlu {
     }
 
     void
+    insert_after(iterator& pos, iterator next, T* x) noexcept
+    {
+      (x->*L) = next;
+      (pos.ptr_->*L) = x;
+    }
+
+    void
     erase_after(iterator pos) noexcept
     {
       (pos.ptr_->*L) = ((pos.ptr_->*L).next->*L);
-    }
-
-    iterator
-    erase_after(iterator pos, iterator last) noexcept
-    {
-      (pos.ptr_->*L) = (last.ptr_->*L);
-      return last;
     }
 
     /*

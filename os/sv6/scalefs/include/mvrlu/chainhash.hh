@@ -76,10 +76,8 @@ namespace mvrlu {
           auto prev = it++;
           if (!prev.try_lock() || !it.try_lock())
             goto restart;
-          auto *node = new item(k, v);
-          node->link = it;
-          prev->link = node;
 
+          b->chain.insert_after(prev, it, new item(k, v));
           if (tsc)
             *tsc = get_tsc();
           return true;
@@ -91,6 +89,7 @@ namespace mvrlu {
       auto it = b->chain.before_begin();
       if (!it.try_lock())       // lock the object
         goto restart;
+
       b->chain.insert_after(it, new item(k, v));
       if (tsc)
         *tsc = get_tsc();
