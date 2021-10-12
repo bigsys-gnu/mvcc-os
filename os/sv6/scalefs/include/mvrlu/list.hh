@@ -51,11 +51,7 @@ namespace mvrlu {
     T *ptr_;
   public:
     constexpr iter(void): ptr_(nullptr) {}
-    iter(const iter &o)
-    {
-      auto &h = *myproc()->handle;
-      ptr_ = h.mvrlu_deref(o.ptr_);
-    }
+    constexpr iter(const iter &o): ptr_(o.ptr_) {}
     iter(T *ptr) {
       auto &h = *myproc()->handle;
       ptr_ = h.mvrlu_deref(ptr);
@@ -186,13 +182,14 @@ namespace mvrlu {
     iterator
     begin(void) noexcept
     {
-      return iterator((head_.next->*L).next);
+      return ++iterator(head_.next);
     }
 
     const iterator
     begin() const noexcept
     {
-      return iterator((head_.next->*L).next);
+      // return iterator((head_.next->*L).next);
+      return ++iterator(head_.next);
     }
 
     iterator
@@ -214,21 +211,23 @@ namespace mvrlu {
     }
 
     void
-    insert_after(iterator pos, T* x) noexcept
+    insert_after(iterator &pos, T* x) noexcept
     {
       (x->*L) = (pos.ptr_->*L);
       (pos.ptr_->*L) = x;
     }
 
     void
-    insert_after(iterator pos, iterator next, T* x) noexcept
+    insert_after(iterator &pos, iterator &next, T* x) noexcept
     {
+      // mvrlu_assign_pointer(&x->link.next, next.ptr_);
+      // mvrlu_assign_pointer(&(pos.ptr_->*L).next, x);
       (x->*L) = next;
       (pos.ptr_->*L) = x;
     }
 
     void
-    erase_after(iterator pos) noexcept
+    erase_after(iterator &pos) noexcept
     {
       (pos.ptr_->*L) = ((pos.ptr_->*L).next->*L);
     }
