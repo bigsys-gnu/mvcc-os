@@ -221,7 +221,7 @@ namespace mvrlu {
     }
 
     void
-    insert_after(iterator& pos, iterator next, T* x) noexcept
+    insert_after(iterator pos, iterator next, T* x) noexcept
     {
       (x->*L) = next;
       (pos.ptr_->*L) = x;

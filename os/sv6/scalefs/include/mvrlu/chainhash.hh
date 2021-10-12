@@ -67,33 +67,24 @@ namespace mvrlu {
 
     restart:
       mvrlu_section s;
-      for (auto it = b->chain.begin(); it != b->chain.end(); it++)
+      auto cur = b->chain.before_begin();
+      auto prev = cur++;
+      for (; ; prev = cur, cur++)
       {
-        if (it->key > k)
-          continue;
-        else if (it->key < k)
+        if (cur == nullptr || cur->key > k)
         {
-          auto prev = it++;
-          if (!prev.try_lock() || !it.try_lock())
+          if (!prev.try_lock() || !cur.try_lock())
             goto restart;
 
-          b->chain.insert_after(prev, it, new item(k, v));
+          b->chain.insert_after(prev, cur, new item(k, v));
           if (tsc)
             *tsc = get_tsc();
           return true;
         }
-        else                    // same key is exist!
+        else if (cur->key == k)  // duplicated key
           return false;
       }
-      // bucket is empty!
-      auto it = b->chain.before_begin();
-      if (!it.try_lock())       // lock the object
-        goto restart;
-
-      b->chain.insert_after(it, new item(k, v));
-      if (tsc)
-        *tsc = get_tsc();
-      return true;
+      return false;
     }
 
     bool remove(const K& k, const V& v, u64 *tsc = NULL) {
@@ -215,10 +206,10 @@ namespace mvrlu {
       mvrlu_section s;
       for (const item& i : b->chain)
       {
-        if (i.key < k)
+        if (i.key != k)
           continue;
-        else if (i.key > k)
-          return false;
+        // else if (i.key > k)
+        //   return false;
         if (vptr)
           *vptr = i.val;
         return true;
