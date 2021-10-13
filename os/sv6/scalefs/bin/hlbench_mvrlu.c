@@ -421,7 +421,7 @@ int main(int argc, char **argv)
     printf("  #remove     : %d\n", param_list[i].result_remove);
     printf("  #contains   : %d\n", param_list[i].result_contains);
     printf("  #found      : %d\n", param_list[i].result_found);
-    reads += param_list[i].result_found;
+    reads += param_list[i].result_contains;
     updates += (param_list[i].result_add + param_list[i].result_remove);
     total_variation += param_list[i].variation;
   }
