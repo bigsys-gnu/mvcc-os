@@ -69,7 +69,7 @@ namespace mvrlu {
       mvrlu_section s;
       auto cur = b->chain.before_begin();
       auto prev = cur++;
-      for (; ; prev = cur, cur++)
+      for (; ; prev = cur, ++cur)
       {
         if (cur == nullptr || cur->key > k)
         {
@@ -88,7 +88,6 @@ namespace mvrlu {
     }
 
     bool remove(const K& k, const V& v, u64 *tsc = NULL) {
-      auto &h = *myproc()->handle;
       bucket *b = &buckets_[hash(k) % nbuckets_];
 
     restart:
@@ -97,8 +96,7 @@ namespace mvrlu {
       auto end = b->chain.end();
       for (;;)
       {
-        auto prev = i;
-        ++i;
+        auto prev = i++;
         if (i == end)
           return false;
         if (i->key == k && i->val == v)
@@ -107,7 +105,7 @@ namespace mvrlu {
             goto restart;
 
           b->chain.erase_after(prev);
-          h.mvrlu_free(&*i);
+          myproc()->handle->mvrlu_free(&*i);
           if (tsc)
             *tsc = get_tsc();
           return true;
@@ -116,7 +114,6 @@ namespace mvrlu {
     }
 
     bool remove(const K& k, u64 *tsc = NULL) {
-      auto &h = *myproc()->handle;
       bucket* b = &buckets_[hash(k) % nbuckets_];
 
     restart:
@@ -125,8 +122,7 @@ namespace mvrlu {
       auto end = b->chain.end();
       for (;;)
       {
-        auto prev = i;
-        ++i;
+        auto prev = i++;
         if (i == end)
           return false;
         if (i->key == k)
@@ -135,7 +131,7 @@ namespace mvrlu {
             goto restart;
 
           b->chain.erase_after(prev);
-          h.mvrlu_free(&*i);
+          myproc()->handle->mvrlu_free(&*i);
           if (tsc)
             *tsc = get_tsc();
           return true;
@@ -179,7 +175,6 @@ namespace mvrlu {
     }
 
     int getSize() {
-
       int size = 0;
 
       mvrlu_section s;
@@ -191,7 +186,6 @@ namespace mvrlu {
             size++;
         }
       }
-
       return size;
     }
 
@@ -206,10 +200,10 @@ namespace mvrlu {
       mvrlu_section s;
       for (const item& i : b->chain)
       {
-        if (i.key != k)
+        if (i.key < k)
           continue;
-        // else if (i.key > k)
-        //   return false;
+        else if (i.key > k)
+          return false;
         if (vptr)
           *vptr = i.val;
         return true;

@@ -188,7 +188,6 @@ namespace mvrlu {
     const iterator
     begin() const noexcept
     {
-      // return iterator((head_.next->*L).next);
       return ++iterator(head_.next);
     }
 
@@ -211,23 +210,21 @@ namespace mvrlu {
     }
 
     void
-    insert_after(iterator &pos, T* x) noexcept
+    insert_after(iterator pos, T* x) noexcept
     {
       (x->*L) = (pos.ptr_->*L);
       (pos.ptr_->*L) = x;
     }
 
     void
-    insert_after(iterator &pos, iterator &next, T* x) noexcept
+    insert_after(iterator pos, iterator next, T* x) noexcept
     {
-      // mvrlu_assign_pointer(&x->link.next, next.ptr_);
-      // mvrlu_assign_pointer(&(pos.ptr_->*L).next, x);
       (x->*L) = next;
       (pos.ptr_->*L) = x;
     }
 
     void
-    erase_after(iterator &pos) noexcept
+    erase_after(iterator pos) noexcept
     {
       (pos.ptr_->*L) = ((pos.ptr_->*L).next->*L);
     }
