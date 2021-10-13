@@ -312,7 +312,7 @@ int main(int argc, char **argv)
     printf("%d Option is inserted\n", argc - 1);
     break;
   }
-  printf("\n#### Chaned hash table for RCU user-level ####\n");
+  printf("\n#### Chained hash table for RCU user-level ####\n");
   printf( "-Nb threads   : %d\n", nb_threads);
   printf( "-Initial size : %d\n", initial);
   printf( "-Buckets      : %d\n", n_buckets);
