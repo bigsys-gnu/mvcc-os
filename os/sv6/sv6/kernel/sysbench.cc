@@ -350,9 +350,9 @@ void test<spinlock_bench>(void *param) {
         {
           if(p_list->list_find(value) >= 0)
             {
-              p_data->result_contains++;
+                p_data->result_found++;
             }
-          p_data->result_found++;
+          p_data->result_contains++;
         }
     }
   cprintf("thread %d end\n", myproc()->pid);
@@ -433,9 +433,9 @@ void test<rcu_bench>(void *param) {
         {
           if(hash_list.lookup(value))
             {
-              p_data->result_contains++;
+                p_data->result_found++;
             }
-          p_data->result_found++;
+          p_data->result_contains++;
         }
     }
   cprintf("thread %d end\n", myproc()->pid);
@@ -655,9 +655,9 @@ void test<mvrlu_bench>(void *param) {
         {
           if(p_list->list_find(*handle, value) >= 0)
             {
-              p_data->result_contains++;
+                p_data->result_found++;
             }
-          p_data->result_found++;
+          p_data->result_contains++;
         }
     }
   delete handle;
@@ -805,7 +805,7 @@ void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[]
       cprintf( "  #remove     : %lu\n", param_list[i]->result_remove);
       cprintf( "  #contains   : %lu\n", param_list[i]->result_contains);
       cprintf( "  #found      : %lu\n", param_list[i]->result_found);
-      reads += param_list[i]->result_found;
+      reads += param_list[i]->result_contains;
       updates += (param_list[i]->result_add + param_list[i]->result_remove);
       total_variation += param_list[i]->variation;
     }
