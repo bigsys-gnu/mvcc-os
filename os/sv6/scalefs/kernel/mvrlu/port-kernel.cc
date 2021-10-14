@@ -79,10 +79,15 @@ void port_free(void *ptr)
 
 void port_cpu_relax_and_yield(void)
 {
-  if (mycpu()->ncli == 0)
+  int num = 0;
+  while (mycpu()->ncli)
   {
-    yield();
+    num++;
+    popcli();
   }
+  yield();
+  while (mycpu()->ncli < num)
+    pushcli();
   cpu_relax();
 }
 
