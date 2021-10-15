@@ -12,7 +12,7 @@
 #include "version.hh"
 #include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
-#include "chainhash.hh"
+#include "sorted_chainhash.hh"
 #include "chainhash_spinlock.hh"
 #include "mvcc_kernel_bench.h"
 
@@ -373,16 +373,11 @@ unsigned long hash<int>(int const& k) {
 }
 
 // rcu hash list should not have any dynamic allocated data
-struct rcu_hash_list : public chainhash<int, int> {
-  rcu_hash_list(u64 nbuckets): chainhash<int, int>(nbuckets) {}
+struct rcu_hash_list : public sorted_chainhash<int, int> {
+  rcu_hash_list(u64 nbuckets): sorted_chainhash<int, int>(nbuckets) {}
 
   int get_total_node_num(void) {
-    total_node_num_ = 0;
-    enumerate([this](int, int){
-      this->total_node_num_++;
-      return false;
-    });
-    return total_node_num_;
+    return getSize();
   }
 
   int raw_insert(int key) {
@@ -390,8 +385,6 @@ struct rcu_hash_list : public chainhash<int, int> {
   }
 
   NEW_DELETE_OPS(rcu_hash_list);
-private:
-  int total_node_num_;
 };
 
 template <>
