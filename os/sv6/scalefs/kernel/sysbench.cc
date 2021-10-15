@@ -12,9 +12,10 @@
 #include "version.hh"
 #include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
-#include "chainhash.hh"
+#include "sorted_chainhash.hh"
 #include "chainhash_spinlock.hh"
 #include "mvcc_kernel_bench.h"
+#include "hash.hh"
 
 #include <uk/mman.h>
 #include <uk/utsname.h>
@@ -135,7 +136,7 @@ public:
 
   list<T> *
   get_list(int key) {
-    return buckets_[key % n_buckets_];
+    return buckets_[hash(key) % n_buckets_];
   }
 
   // only for initialization
@@ -311,7 +312,7 @@ public:
 
 template <>
 void test<spinlock_bench>(void *param) {
-  int op, bucket, value;
+  int op, value;
   auto *p_data = reinterpret_cast<thread_param<spinlock_bench> *>(param);
   auto &hash_list = *p_data->hl;
 
@@ -323,8 +324,7 @@ void test<spinlock_bench>(void *param) {
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
-      bucket = value % p_data->n_buckets;
-      auto *p_list = hash_list.get_list(bucket);
+      auto *p_list = hash_list.get_list(value);
 
       if (op < p_data->update)
         {
@@ -373,16 +373,11 @@ unsigned long hash<int>(int const& k) {
 }
 
 // rcu hash list should not have any dynamic allocated data
-struct rcu_hash_list : public chainhash<int, int> {
-  rcu_hash_list(u64 nbuckets): chainhash<int, int>(nbuckets) {}
+struct rcu_hash_list : public sorted_chainhash<int, int> {
+  rcu_hash_list(u64 nbuckets): sorted_chainhash<int, int>(nbuckets) {}
 
   int get_total_node_num(void) {
-    total_node_num_ = 0;
-    enumerate([this](int, int){
-      this->total_node_num_++;
-      return false;
-    });
-    return total_node_num_;
+    return getSize();
   }
 
   int raw_insert(int key) {
@@ -390,8 +385,6 @@ struct rcu_hash_list : public chainhash<int, int> {
   }
 
   NEW_DELETE_OPS(rcu_hash_list);
-private:
-  int total_node_num_;
 };
 
 template <>
@@ -690,7 +683,7 @@ void bench_finish<mvrlu_bench>(void) {
 
 template <>
 void test<mvrlu_bench>(void *param) {
-  int op, bucket, value;
+  int op, value;
   auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
   auto &hash_list = *p_data->hl;
   auto *handle = new mvrlu::thread_handle<mvrlu_node>();
@@ -703,8 +696,7 @@ void test<mvrlu_bench>(void *param) {
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
-      bucket = value % p_data->n_buckets;
-      auto *p_list = hash_list.get_list(bucket);
+      auto *p_list = hash_list.get_list(value);
 
       if (op < p_data->update)
         {
