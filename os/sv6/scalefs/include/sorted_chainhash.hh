@@ -69,15 +69,16 @@ public:
       return false;
 
     auto it = b->chain.before_begin();
-    for (auto prev = it++; it != b->chain.end(); prev = it++)
+    auto prev = it++;
+    for (; it != b->chain.end(); prev = it++)
     {
       if (it->key < k)
         continue;
       if (it->key == k)
         return false;
-      b->chain.insert_after(prev, new item(k, v));
       break;
     }
+    b->chain.insert_after(prev, new item(k, v));
     if (tsc)
       *tsc = get_tsc();
     return true;
@@ -292,8 +293,8 @@ public:
       bucket* b = &buckets_[i];
 
       for (const item& i: b->chain) {
-          if (i.key != 0)
-            size++;
+        (void)i;
+        size++;
       }
     }
 
