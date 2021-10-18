@@ -49,8 +49,6 @@ proc::proc(int npid) :
   gc = new gc_handle();
   memset(__cxa_eh_global, 0, sizeof(__cxa_eh_global));
   memset(sig, 0, sizeof(sig));
-
-  handle = new mvrlu::thread_handle();
 }
 
 proc::~proc(void)
@@ -59,8 +57,6 @@ proc::~proc(void)
   if (fpu_state)
     kmfree(fpu_state, FXSAVE_BYTES);
   fpu_state = nullptr;
-
-  delete handle;
 }
 
 void

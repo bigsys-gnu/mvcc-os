@@ -113,7 +113,7 @@ struct proc {
   uptr unmapped_hint;
   sigaction sig[NSIG];
 
-  mvrlu::thread_handle* handle;
+  mvrlu::thread_handle handle;
 
   static proc* alloc();
   void         set_state(procstate_t s);

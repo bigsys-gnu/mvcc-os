@@ -544,7 +544,7 @@ public:
 
   int pop(void) {
     mvrlu_node *iter;
-    mvrlu::thread_handle &h = *myproc()->handle;
+    mvrlu::thread_handle &h = myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -575,7 +575,7 @@ public:
   int list_insert(int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
-    mvrlu::thread_handle &h = *myproc()->handle;
+    mvrlu::thread_handle &h = myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -606,7 +606,7 @@ public:
   int list_delete(int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
-    mvrlu::thread_handle &h = *myproc()->handle;
+    mvrlu::thread_handle &h = myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -634,7 +634,7 @@ public:
 
   int list_find(int key) {
     int value = -1;
-    mvrlu::thread_handle &h = *myproc()->handle;
+    mvrlu::thread_handle &h = myproc()->handle;
 
     h.mvrlu_reader_lock();
     auto *cur = h.mvrlu_deref(head_);
@@ -680,7 +680,7 @@ public:
 
   int get_total_node_num(void) {
     int total_num = 0;
-    mvrlu::thread_handle &h = *myproc()->handle;
+    mvrlu::thread_handle &h = myproc()->handle;
     mvrlu_node *iter;
 
     h.mvrlu_reader_lock();
@@ -741,7 +741,7 @@ void test<mvrlu_bench>(void *param) {
           p_data->result_found++;
         }
     }
-  myproc()->handle->mvrlu_flush_log();
+  myproc()->handle.mvrlu_flush_log();
   cprintf("thread %d end\n", myproc()->pid);
 }
 //////////////////////////////////////

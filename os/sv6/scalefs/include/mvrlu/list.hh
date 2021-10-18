@@ -53,7 +53,7 @@ namespace mvrlu {
     constexpr iter(void): ptr_(nullptr) {}
     constexpr iter(const iter &o): ptr_(o.ptr_) {}
     iter(T *ptr) {
-      auto &h = *myproc()->handle;
+      auto &h = myproc()->handle;
       ptr_ = h.mvrlu_deref(ptr);
     }
 
@@ -62,7 +62,7 @@ namespace mvrlu {
     {
       if (ptr_ == nullptr)
         return true;
-      auto &h = *myproc()->handle;
+      auto &h = myproc()->handle;
       bool ret = h.mvrlu_try_lock(&ptr_);
       if (!ret)
         h.mvrlu_abort();
@@ -74,7 +74,7 @@ namespace mvrlu {
     {
       if (ptr_ == nullptr)
         return true;
-      auto &h = *myproc()->handle;
+      auto &h = myproc()->handle;
       bool ret = h.mvrlu_try_lock_const(ptr_);
       if (!ret)
         h.mvrlu_abort();
@@ -103,7 +103,7 @@ namespace mvrlu {
     iter
     operator=(T *rhs)
     {
-      auto &h = *myproc()->handle;
+      auto &h = myproc()->handle;
       ptr_ = h.mvrlu_deref(rhs);
 
       return *this;
@@ -112,7 +112,7 @@ namespace mvrlu {
     iter &
     operator++(void)
     {
-      auto &h = *myproc()->handle;
+      auto &h = myproc()->handle;
       ptr_ = h.mvrlu_deref((ptr_->*L).next);
 
       return *this;

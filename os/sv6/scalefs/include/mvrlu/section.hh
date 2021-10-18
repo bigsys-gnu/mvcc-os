@@ -9,11 +9,11 @@ namespace mvrlu {
   public:
     mvrlu_section(void)
     {
-      myproc()->handle->mvrlu_reader_lock();
+      myproc()->handle.mvrlu_reader_lock();
     }
     ~mvrlu_section(void)
     {
-      myproc()->handle->mvrlu_reader_unlock();
+      myproc()->handle.mvrlu_reader_unlock();
     }
   };
 }

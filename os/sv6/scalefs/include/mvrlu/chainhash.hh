@@ -34,7 +34,7 @@ namespace mvrlu {
       list<item, &item::link> chain;
 
       ~bucket() {
-        auto &h = *myproc()->handle;
+        auto &h = myproc()->handle;
 
         // need fix here
         mvrlu_section s;
@@ -105,7 +105,7 @@ namespace mvrlu {
             goto restart;
 
           b->chain.erase_after(prev);
-          myproc()->handle->mvrlu_free(&*i);
+          myproc()->handle.mvrlu_free(&*i);
           if (tsc)
             *tsc = get_tsc();
           return true;
@@ -131,7 +131,7 @@ namespace mvrlu {
             goto restart;
 
           b->chain.erase_after(prev);
-          myproc()->handle->mvrlu_free(&*i);
+          myproc()->handle.mvrlu_free(&*i);
           if (tsc)
             *tsc = get_tsc();
           return true;
