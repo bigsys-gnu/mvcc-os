@@ -1,6 +1,9 @@
 #pragma once
 
 #include <stdint.h>
+#include "types.h"
+#include "cpuid.hh"
+#include "amd64.h"
 
 class hpet
 {
