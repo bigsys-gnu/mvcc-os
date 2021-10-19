@@ -91,7 +91,7 @@ LDFLAGS := -pthread
 endif
 COMFLAGS += -g -MD -MP -O3 -Wall -Werror -DHW_$(HW) $(INCLUDES)
 CFLAGS   := $(COMFLAGS) -std=c99 $(CFLAGS)
-CXXFLAGS := $(COMFLAGS) -std=c++0x -Wno-sign-compare $(CXXFLAGS)
+CXXFLAGS := $(COMFLAGS) -std=c++11 -Wno-sign-compare $(CXXFLAGS)
 ASFLAGS  := $(ASFLAGS) -Iinclude -I$(O)/include -m64 -gdwarf-2 -MD -MP -DHW_$(HW) -include param.h
 
 ifeq ($(EXCEPTIONS),y)
@@ -174,7 +174,7 @@ $(O)/%.o: $(O)/%.S
 $(O)/sysroot: include/host_hdrs.hh
 	rm -rf $@.tmp $@
 	mkdir -p $@.tmp
-	tar c $$($(CXX) -E -H -std=c++0x -ffreestanding $< -o /dev/null 2>&1 \
+	tar c $$($(CXX) -E -H -std=c++11 -ffreestanding $< -o /dev/null 2>&1 \
 		| awk '/^[.]/ {print $$2}') | tar xC $@.tmp
 	mv $@.tmp $@
 
@@ -189,7 +189,12 @@ JOURNALS = $(foreach num, $(shell seq 0 $(shell dc -e "${QEMUSMP} 1 - p")), sv6j
 FSEXTRA += ${JOURNALS}
 FSEXTRA += testfile1 README
 else
-FSEXTRA += sv6journal* testfile1 README
+ifndef ${NCPU}
+$(error "Need to define NCPU=?")
+endif
+JOURNALS = $(foreach num, $(shell seq 0 $(shell dc -e "${NCPU} 1 - p")), sv6journal${num})
+FSEXTRA += ${JOURNALS}
+FSEXTRA += testfile1 README
 endif
 
 $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS) $(O)/dbench/dbench
