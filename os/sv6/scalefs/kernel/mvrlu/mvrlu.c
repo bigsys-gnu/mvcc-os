@@ -1,4 +1,5 @@
 #include "mvrlu/mvrlu.h"
+#include "libutil.h"
 #include "mvrlu/mvrlu_i.h"
 #include "mvrlu/debug.h"
 #include "mvrlu/arch.h"
@@ -1192,6 +1193,10 @@ static void __qp_thread_main(void *arg)
 	mvrlu_qp_thread_t *qp_thread = arg;
 	int reclaim_done;
 	int i;
+
+    #ifndef __KERNEL__
+    setaffinity(0);
+    #endif
 
 	/* qp detection loop */
 	reclaim_done = 1;
