@@ -140,10 +140,8 @@ int list_insert(int key, list_t *list)
 
         /* insert node */
         new_node->next = prev->next;  //read
-        do {
-          prev->next = new_node;  //write
-          __sync_synchronize();
-        } while(0);
+        barrier();
+        prev->next = new_node;  //write
           
         ret = 1;
 	    break;
@@ -163,10 +161,8 @@ int list_insert(int key, list_t *list)
       
       /* insert node */
       new_node->next = prev->next; //read
-      do {
-          prev->next = new_node; //write
-		  __sync_synchronize();
-	    } while(0);
+      barrier();
+      prev->next = new_node; //write
 
       ret = 1;
     }
@@ -178,7 +174,7 @@ int list_insert(int key, list_t *list)
 
 int list_delete(int key, list_t *list, struct rcu_data *d)
 {
-  node_t *prev, *cur, *cur_n;
+  node_t *prev, *cur;
   int ret = 0;
 
   pthread_spin_lock(&list->l);
@@ -187,15 +183,13 @@ int list_delete(int key, list_t *list, struct rcu_data *d)
     /* found the target to be trashed. */
     if (cur->value == key)
     {
-      cur_n = cur->next;
-
-      prev->next = cur_n;
+      prev->next = cur->next;
       ret = 1;
       break;
     }
   }
-  rcu_synchronize(&rcu_global, d);
   pthread_spin_unlock(&list->l);
+  rcu_synchronize(&rcu_global, d);
   free(cur);
 
   return ret;
@@ -233,7 +227,7 @@ void *test(void* param)
   thread_param_t *p_data = (thread_param_t*)param; 
   hash_list_t *p_hash_list = p_data->p_hash_list;
 
-  if (setaffinity(p_data->id % NCPU) < 0)
+  if (setaffinity((p_data->id + 1) % NCPU) < 0)
     die("Error setaffinity\n");
 
   rcu_register(&rcu_global, &self);

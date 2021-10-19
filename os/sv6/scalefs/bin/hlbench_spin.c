@@ -226,7 +226,7 @@ void *test(void* param)
   thread_param_t *p_data = (thread_param_t*)param; 
   hash_list_t *p_hash_list = p_data->p_hash_list;
   
-  if (setaffinity(p_data->id % NCPU) < 0)
+  if (setaffinity((p_data->id + 1)% NCPU) < 0)
     die("Error setaffinity\n");
 
   pthread_barrier_wait(&bar);
