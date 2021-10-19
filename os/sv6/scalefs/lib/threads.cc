@@ -172,7 +172,7 @@ sched_setaffinity(int pid, size_t cpusetsize, cpu_set_t *mask)
 }
 
 int       
-pthread_spin_init(pthread_spinlock_t *spin, const pthread_spinlockattr_t *attr)
+pthread_spin_init(pthread_spinlock_t *spin, const pthread_spinlockattr_t attr)
 {
   *spin = 0;
   return 0;

@@ -61,7 +61,7 @@ typedef struct node {
 
 typedef struct list {
   node_t *head;
-  pthread_mutex_t l;
+  pthread_spinlock_t l;
 } list_t;
 
 typedef struct hash_list {
@@ -131,7 +131,7 @@ int list_insert(int key, list_t *list)
   node_t *prev, *cur, *new_node;
   int ret = 0;
 
-  pthread_mutex_lock(&list->l);
+  pthread_spin_lock(&list->l);
 
   for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
   {
@@ -149,7 +149,7 @@ int list_insert(int key, list_t *list)
     }
     else if (cur->value == key)
     {
-      pthread_mutex_unlock(&list->l);
+      pthread_spin_unlock(&list->l);
       return ret;             /* the key value already exists. */
     }    
   }
@@ -166,7 +166,7 @@ int list_insert(int key, list_t *list)
       ret = 1;
     }
 
-  pthread_mutex_unlock(&list->l);
+  pthread_spin_unlock(&list->l);
   return ret;
 }
 
@@ -175,7 +175,7 @@ int list_delete(int key, list_t *list)
   node_t *prev, *cur, *cur_n;
   int ret = 0;
 
-  pthread_mutex_lock(&list->l);
+  pthread_spin_lock(&list->l);
   for (prev = list->head, cur = prev->next; cur != NULL; prev = cur, cur = cur->next)
   {
     /* found the target to be trashed. */
@@ -188,7 +188,7 @@ int list_delete(int key, list_t *list)
       break;
     }
   }
-  pthread_mutex_unlock(&list->l);
+  pthread_spin_unlock(&list->l);
   free(cur);
 
   return ret;
@@ -199,7 +199,7 @@ int list_find(int key, list_t *list)
   node_t *cur;
   int value = -1;
 
-  pthread_mutex_lock(&list->l);
+  pthread_spin_lock(&list->l);
 
   cur = list->head;
 
@@ -214,7 +214,7 @@ int list_find(int key, list_t *list)
 	  cur = cur->next;
   }
 
-  pthread_mutex_unlock(&list->l);
+  pthread_spin_unlock(&list->l);
   return value;
 }
 
@@ -337,7 +337,7 @@ int main(int argc, char **argv)
     list->head->next = NULL;
     p_hash_list->buckets[i] = list;
     /* list->l */
-    pthread_mutex_init(&list->l, NULL);
+    pthread_spin_init(&list->l, 0);
   }
 
   printf("initialize %d nodes...", initial);
