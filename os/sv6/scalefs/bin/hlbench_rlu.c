@@ -227,7 +227,7 @@ void *test(void* param)
   hash_list_t *p_hash_list = p_data->p_hash_list;
   rlu_thread_data_t *self = &p_data->self;
 
-  if (setaffinity(p_data->id % NCPU) < 0)
+  if (setaffinity((p_data->id + 1) % NCPU) < 0)
   {
     RLU_THREAD_FINISH(self);
     die("cpu affinity error\n");
