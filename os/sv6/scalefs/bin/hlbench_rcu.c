@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: Copyright (c) 2021 Gyeongsang National University
+//
+// SPDX-License-Identifier: Apache 2.0 AND MIT
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <unistd.h>
