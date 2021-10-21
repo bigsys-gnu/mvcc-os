@@ -27,21 +27,16 @@ mvcc-os
 Building and running KhronOS
 --------------------------------
 ```{.sh}
-`cd os/sv6/scalefs`
-```
-```{.sh}
-`make && make qemu`
+cd os/sv6/scalefs
+make && make qemu
 ```
 
 Running benchmarks
 --------------------------------
 On a KhronOS prompt
 ```{.sh}
-`run\_hlbench.sh`
-```
-
-```{.sh}
-`kbench $arguments`
+run\_hlbench.sh
+kbench $arguments
 ```
 
 ```
@@ -221,9 +216,9 @@ Development guide for KhronOS
 ------------------------------
 Here are some example of applying MV-RLU/RLU to the OS components.
 ```{.sh}
-`os/sv6/scalefs/hlbench_mvrlu.c`
-`os/sv6/scalefs/kernel/sysbench.cc`
-`os/sv6/scalefs/kernel/scalefs.cc`
+os/sv6/scalefs/hlbench_mvrlu.c
+os/sv6/scalefs/kernel/sysbench.cc
+os/sv6/scalefs/kernel/scalefs.cc
 ```
 
 
