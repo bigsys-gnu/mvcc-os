@@ -7,7 +7,7 @@ KhronOS has been tested on qemu and native hardware with with Intel x86\_64 Proc
 
 We have released this prototype under an open-source license to enable collaboration with parties outside. It is composed of multiple modules: Scalefs based on sv6, MV-RLU and libraries. KhronOS is under the Apache 2.0 license(```./LICENSE```), Scalefs follows MIT license(```./os/sv6/scalefs/LICENSE.scalefs```), MV-RLU is under the Apache 2.0 license(```./sync/mvrlulib/LICENSE.mvrlu```). Each file in Scalefs may have its own copyright/license that is embedded in the code.
 
-## Directory structure
+## Directory structure (with License files)
 ```{.sh}
 mvcc-os
 ├── LICENSE         # KhronOS license
