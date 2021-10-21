@@ -58,6 +58,11 @@ half-baked experiments, dead code, some really cool hacks, and a few
 great results.
 
 
+Scalefs Booting Screen (QEMU)
+------------------------
+![](./booting_screen.png) 
+
+
 Building and running sv6 in QEMU
 --------------------------------
 
