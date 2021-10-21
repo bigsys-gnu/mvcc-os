@@ -1,20 +1,39 @@
-# mvcc-os
+# KhronOS
 =====================================================================
 
-This repository contains the code for KHRONOS, a scalable
-operating systems with multi-version concurrency control mechanism. 
+This repository contains the code for KhronOS, an scalable
+operating systems based on sv6 (MIT) with MV-RLU (multi-version concurrency control mechanism).
+KhronOS has been tested on qemu and native hardware with with Intel x86\_64 Processor.
+
+We have released this prototype under an open-source license to enable collaboration with parties outside. It is composed of multiple modules: Scalefs based on sv6, MV-RLU and libraries. KhronOS is under the Apache 2.0 license(```./LICENSE```), Scalefs follows MIT license(```./os/sv6/scalefs/LICENSE.scalefs```), MV-RLU is under the Apache 2.0 license(```./sync/mvrlulib/LICENSE.mvrlu```). Each file in Scalefs may have its own copyright/license that is embedded in the code.
 
 ## Directory structure
 ```{.sh}
 mvcc-os
 ├── doc             # documents
 ├── sync            # sync library
+│   ├── mvrlulib      	# mvrlulib
+│   ├── include         # include
 ├── os           	# os
 │   ├── sv6         	# sv6
-│   ├── scalefs         # scalefs
+│   ├── scalefs        	# scalefs
 └── tools           # tools
 ```
 
+Building and running KhronOS
+--------------------------------
+`cd os/sv6/scalefs`
+`make && make qemu`
+
+Running benchmarks
+--------------------------------
+On a KhronOS prompt
+`run\_hlbench.sh`
+`kbench $arguments`
+TBD `application and other benchmark`
+
+what is sv6 and Scalefs
+--------------------------------
 sv6 is a POSIX-like research operating system designed for multicore
 scalability based on [xv6](http://pdos.csail.mit.edu/6.828/xv6).
 
@@ -175,3 +194,12 @@ counters.  To see the changes in these counters over a command, run,
 e.g.
 
     monkstats mailbench -a all / 1
+
+
+Contribution guide for KhronOS
+------------------------------
+We welcome any contribution from open source developers to the KhronOS. We have following outstanding issues and interesting topics.
+ - Apply MV-RLU/RLU to shared data structures in Scalefs to improve scalability on many-core machines 
+ - Hack VM layers for improving scalability with MV-RLU/RLU 
+ - Hack Filesystem (memory and disk layers) for improving scalability with MV-RLU/RLU
+
