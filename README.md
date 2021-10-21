@@ -32,7 +32,7 @@ On a KhronOS prompt
 `kbench $arguments`
 TBD `application and other benchmark`
 
-what is sv6 and Scalefs
+What is sv6 and Scalefs
 --------------------------------
 sv6 is a POSIX-like research operating system designed for multicore
 scalability based on [xv6](http://pdos.csail.mit.edu/6.828/xv6).
@@ -203,3 +203,6 @@ We welcome any contribution from open source developers to the KhronOS. We have 
  - Hack VM layers for improving scalability with MV-RLU/RLU 
  - Hack Filesystem (memory and disk layers) for improving scalability with MV-RLU/RLU
 
+TBD
+------------------------------
+screen shot for KhronOS booting 
