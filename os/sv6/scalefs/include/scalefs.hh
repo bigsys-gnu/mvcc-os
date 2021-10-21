@@ -835,11 +835,11 @@ class mfs_interface
     sref<mnode> mnode_alloc(u64 inum, u8 mtype);
     sref<inode> get_inode(u64 mnum, const char *str);
     // Mapping from disk inode numbers to the corresponding mnode numbers
-    mvrlu::chainhash<u64, u64> *inum_to_mnum;
+    chainhash<u64, u64> *inum_to_mnum;
     // Mapping from in-memory mnode numbers to disk inode numbers
-    mvrlu::chainhash<u64, u64> *mnum_to_inum;
+    chainhash<u64, u64> *mnum_to_inum;
     chainhash<u64, sleeplock*> *mnum_to_lock;
-    mvrlu::chainhash<u64, strbuf<DIRSIZ>> *mnum_to_name;
+    chainhash<u64, strbuf<DIRSIZ>> *mnum_to_name;
 
     typedef struct mfs_op_idx {
       int create_index;

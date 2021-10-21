@@ -14,10 +14,10 @@ mfs_interface::mfs_interface()
   for (int cpu = 0; cpu < NCPU; cpu++)
     fs_journal[cpu] = new journal();
 
-  inum_to_mnum = new mvrlu::chainhash<u64, u64>(NINODES_PRIME);
-  mnum_to_inum = new mvrlu::chainhash<u64, u64>(NINODES_PRIME);
+  inum_to_mnum = new chainhash<u64, u64>(NINODES_PRIME);
+  mnum_to_inum = new chainhash<u64, u64>(NINODES_PRIME);
   mnum_to_lock = new chainhash<u64, sleeplock*>(NINODES_PRIME);
-  mnum_to_name = new mvrlu::chainhash<u64, strbuf<DIRSIZ>>(NINODES_PRIME); // Debug
+  mnum_to_name = new chainhash<u64, strbuf<DIRSIZ>>(NINODES_PRIME); // Debug
   metadata_log_htab = new chainhash<u64, mfs_logical_log*>(NINODES_PRIME);
   blocknum_to_queue = new mvrlu::chainhash<u32, tx_queue_info>(NINODEBITMAP_BLKS_PRIME);
 }
