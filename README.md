@@ -10,13 +10,17 @@ We have released this prototype under an open-source license to enable collabora
 ## Directory structure
 ```{.sh}
 mvcc-os
+├── LICENSE         # KhronOS license
 ├── doc             # documents
 ├── sync            # sync library
-│   ├── mvrlulib      	# mvrlulib
+│   ├── mvrlulib      	# MV-RLU library
+│   |   ├── LICENSE.mvrlu 	# MV-RLU license
 │   ├── include         # include
 ├── os           	# os
 │   ├── sv6         	# sv6
+│   |   ├── LICENSE.sv6 	# sv6 license
 │   ├── scalefs        	# scalefs
+│   |   ├── LICENSE.scalefs	# Scalefs license
 └── tools           # tools
 ```
 
