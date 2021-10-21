@@ -13,8 +13,8 @@ mvcc-os
 ├── LICENSE         # KhronOS license
 ├── doc             # documents
 ├── sync            # sync library
-│   ├── mvrlulib      	# MV-RLU library
-│   |   ├── LICENSE.mvrlu 	# MV-RLU license
+│   ├── mvrlulib[LICENSE.mvrlu](./sync/mvrlulib/LICENSE.mvrlu, "MV-RLU License")      	# MV-RLU library
+│   |   ├──  	# MV-RLU license
 │   ├── include         # include
 ├── os           	# os
 │   ├── sv6         	# sv6
