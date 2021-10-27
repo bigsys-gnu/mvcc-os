@@ -71,22 +71,6 @@ namespace mvrlu {
 
     NEW_DELETE_OPS(thread_handle);
 
-    // // don't deallocate memory right away
-    // // _qp_thread will take care of.
-    // static void operator delete(void *, std::size_t) {}
-
-    // static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
-    //   assert(nbytes == sizeof(thread_handle));
-    //   return port_alloc_x(sizeof(thread_handle), 0);
-    // }
-
-    // static void* operator new(unsigned long nbytes) {
-    //   void *p = thread_handle::operator new(nbytes, std::nothrow);
-    //   if (p == nullptr)
-    //     throw_bad_alloc();
-    //   return p;
-    // }
-
     inline void
     mvrlu_reader_lock(void) {
       ::mvrlu_reader_lock(self_);

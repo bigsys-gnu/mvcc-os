@@ -168,7 +168,8 @@ namespace mvrlu {
         bucket* b = &buckets_[i];
 
         for (const item& i: b->chain) {
-          if (cb(i.key, i.val))
+          V val = i.val;
+          if (cb(i.key, val))
             return;
         }
       }
