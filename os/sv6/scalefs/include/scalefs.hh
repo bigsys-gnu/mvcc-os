@@ -835,9 +835,9 @@ class mfs_interface
     sref<mnode> mnode_alloc(u64 inum, u8 mtype);
     sref<inode> get_inode(u64 mnum, const char *str);
     // Mapping from disk inode numbers to the corresponding mnode numbers
-    chainhash<u64, u64> *inum_to_mnum;
+    mvrlu::chainhash<u64, u64> *inum_to_mnum;
     // Mapping from in-memory mnode numbers to disk inode numbers
-    chainhash<u64, u64> *mnum_to_inum;
+    mvrlu::chainhash<u64, u64> *mnum_to_inum;
     chainhash<u64, sleeplock*> *mnum_to_lock;
     chainhash<u64, strbuf<DIRSIZ>> *mnum_to_name;
 
@@ -865,7 +865,7 @@ class mfs_interface
     // A hash-table to track the last transaction(*) that modified a given
     // inode-block or bitmap-block. (* = specifically, which journal's
     // transaction-queue that transaction went into and at what timestamp).
-    mvrlu::chainhash<u32, tx_queue_info> *blocknum_to_queue;
+    chainhash<u32, tx_queue_info> *blocknum_to_queue;
 
     // List of mnums whose mnodes have hit mnode::onzero() and hence their
     // corresponding on-disk inodes can be deleted.
@@ -877,7 +877,7 @@ class mfs_interface
 
 
   private:
-    chainhash<u64, mfs_logical_log*> *metadata_log_htab; // The logical log
+    mvrlu::chainhash<u64, mfs_logical_log*> *metadata_log_htab; // The logical log
 
     // Set of locks, one per inode-block and one per bitmap-block.
     std::vector<sleeplock*> inodebitmap_locks;
