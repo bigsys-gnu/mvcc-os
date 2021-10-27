@@ -184,12 +184,19 @@ xv6memfs.img: bootblock kernelmemfs
 	dd if=kernelmemfs of=xv6memfs.img seek=1 conv=notrunc
 
 
+ifeq ($(filter clean, $(MAKECMDGOALS)), )
 ifeq ($(HW),qemu)
 JOURNALS = $(foreach num, $(shell seq 0 $(shell dc -e "${QEMUSMP} 1 - p")), sv6journal${num})
 FSEXTRA += ${JOURNALS}
 FSEXTRA += testfile1 README
 else
-FSEXTRA += sv6journal* testfile1 README
+ifndef NCPU
+$(error "Need to define NCPU=?")
+endif
+JOURNALS = $(foreach num, $(shell seq 0 $(shell dc -e "${NCPU} 1 - p")), sv6journal${num})
+FSEXTRA += ${JOURNALS}
+FSEXTRA += testfile1 README
+endif
 endif
 
 $(O)/fs.img: $(O)/tools/mkfs $(FSEXTRA) $(UPROGS) $(O)/dbench/dbench
