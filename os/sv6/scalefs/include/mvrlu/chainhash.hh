@@ -39,8 +39,7 @@ namespace mvrlu {
         // need fix here
         mvrlu_section s;
         for (auto it = chain.begin(); it != chain.end();) {
-          auto trash = it;
-          it++;
+          auto trash = it++;
           h.mvrlu_free(&*trash);
         }
         h.mvrlu_free(&*chain.before_begin());
@@ -69,7 +68,7 @@ namespace mvrlu {
       mvrlu_section s;
       auto cur = b->chain.before_begin();
       auto prev = cur++;
-      for (; ; prev = cur, ++cur)
+      for (; ; prev = cur++)
       {
         if (cur == nullptr || cur->key > k)
         {
@@ -197,7 +196,6 @@ namespace mvrlu {
 
     bool lookup(const K& k, V* vptr = nullptr) const {
       bucket *b = &buckets_[hash(k) % nbuckets_];
-
       mvrlu_section s;
       for (const item& i : b->chain)
       {
@@ -210,7 +208,7 @@ namespace mvrlu {
         return true;
       }
       return false;
-   }
+    }
 
   };
 

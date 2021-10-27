@@ -114,7 +114,6 @@ namespace mvrlu {
     {
       auto &h = myproc()->handle;
       ptr_ = h.mvrlu_deref((ptr_->*L).next);
-
       return *this;
     }
 
@@ -207,13 +206,6 @@ namespace mvrlu {
     empty() const noexcept
     {
       return begin() == end();
-    }
-
-    void
-    insert_after(iterator pos, T* x) noexcept
-    {
-      (x->*L) = (pos.ptr_->*L);
-      (pos.ptr_->*L) = x;
     }
 
     void
