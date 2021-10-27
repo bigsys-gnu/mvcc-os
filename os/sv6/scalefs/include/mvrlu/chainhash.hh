@@ -103,7 +103,7 @@ namespace mvrlu {
           if (!prev.try_lock() || !i.try_lock_const())
             goto restart;
 
-          b->chain.erase_after(prev);
+          b->chain.erase_after(prev, i);
           myproc()->handle.mvrlu_free(&*i);
           if (tsc)
             *tsc = get_tsc();
@@ -129,7 +129,7 @@ namespace mvrlu {
           if (!prev.try_lock() || !i.try_lock_const())
             goto restart;
 
-          b->chain.erase_after(prev);
+          b->chain.erase_after(prev, i);
           myproc()->handle.mvrlu_free(&*i);
           if (tsc)
             *tsc = get_tsc();

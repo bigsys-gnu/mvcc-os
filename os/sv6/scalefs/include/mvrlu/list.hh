@@ -216,11 +216,9 @@ namespace mvrlu {
     }
 
     void
-    erase_after(iterator pos) noexcept
+    erase_after(iterator pos, iterator next) noexcept
     {
-      auto next_next = iterator_to((pos.ptr_->*L).next);
-      next_next++;
-      (pos.ptr_->*L) = next_next;
+      (pos.ptr_->*L) = ++next;
     }
 
     /*
