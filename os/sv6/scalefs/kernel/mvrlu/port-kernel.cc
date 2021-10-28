@@ -1,3 +1,4 @@
+#include "mvrlu/port_data.h"
 #include "types.h"
 #include "kernel.hh"
 #include "spinlock.hh"
@@ -176,13 +177,19 @@ int port_create_thread(const char *name, struct task_struct **t,
                        void (*fn)(void *), void *arg,
                        struct completion *completion)
 {
-  struct proc *temp = threadpin(fn, arg, name, 0);
-  if (temp != NULL)
+  struct proc *temp = threadalloc(fn, arg);
+  if (temp != nullptr)
   {
+    snprintf(temp->name, sizeof(temp->name), "%s", name);
+    temp->cpu_pin = 0;
     port_cond_init(completion);
     *t = (struct task_struct *)temp;
+    scoped_acquire l(&temp->lock);
+    addrun(temp);
+
     return 0;
   }
+
   return -11;
 }
 
