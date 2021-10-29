@@ -90,6 +90,7 @@ public:
         return false;
       if (i->key == k && i->val == v) {
         b->chain.erase_after(prev);
+        delete &*i;
         if (tsc)
           *tsc = get_tsc();
         return true;
@@ -113,6 +114,7 @@ public:
         return false;
       if (i->key == k) {
         b->chain.erase_after(prev);
+        delete &*i;
         if (tsc)
           *tsc = get_tsc();
         return true;
