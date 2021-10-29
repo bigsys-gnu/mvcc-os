@@ -877,7 +877,7 @@ class mfs_interface
 
 
   private:
-    mvrlu::chainhash<u64, mfs_logical_log*> *metadata_log_htab; // The logical log
+    chainhash<u64, mfs_logical_log*> *metadata_log_htab; // The logical log
 
     // Set of locks, one per inode-block and one per bitmap-block.
     std::vector<sleeplock*> inodebitmap_locks;
