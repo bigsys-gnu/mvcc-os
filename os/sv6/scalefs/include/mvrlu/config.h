@@ -5,9 +5,9 @@
 #define DISABLE_MUNMAP
 #define MVRLU_ORDO_TIMESTAMPING	// ENABLE ORDO TIMESTAMP
 
-#define MVRLU_LOG_SIZE (1ul << 17) /* 512KB */
+#define MVRLU_LOG_SIZE (1ul << 17) /* 128KB */
 #define MVRLU_LOG_MASK (~(MVRLU_LOG_SIZE - 1))
-#define MVRLU_MAX_THREAD_NUM (1ul << 10) /* 16384 (2**18 * 2**14 = 2**32) */
+#define MVRLU_MAX_THREAD_NUM (1ul << 7) /* 128 (total 16GB LOG) */
 
 #define MVRLU_MAX_FREE_PTRS 512
 #define MVRLU_QP_INTERVAL_USEC 500 /* 0.5 msec */
