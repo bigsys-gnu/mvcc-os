@@ -233,10 +233,10 @@ cmain(u64 mbmagic, u64 mbaddr)
   initz();
   initproc();      // process table
   initsched();     // scheduler run queues
-  mvrlu_init();    // before first process creation.
-  initidle();
   initgc();        // gc epochs and threads
   initrefcache();  // Requires initsched
+  mvrlu_init();    // before first process creation.
+  initidle();
   initconsole();
   initfutex();
   initsamp();

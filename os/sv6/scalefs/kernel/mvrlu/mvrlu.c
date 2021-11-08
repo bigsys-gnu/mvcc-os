@@ -1288,10 +1288,10 @@ static inline int wakeup_qp_thread_for_reclaim(void)
 /*
  * External APIs
  */
+static int init = 0;
 int mvrlu_init(void)
 {
 	int rc;
-    static int init = 0;
 
 	/* Compile time sanity check */
 	/* static_assert(sizeof(mvrlu_act_hdr_struct_t) < L1_CACHE_BYTES); */
@@ -1318,6 +1318,10 @@ int mvrlu_init(void)
 	}
 
 	return 0;
+}
+
+int mvrlu_is_init(void) {
+  return init;
 }
 
 void mvrlu_finish(void)

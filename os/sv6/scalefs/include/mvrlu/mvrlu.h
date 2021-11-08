@@ -25,6 +25,7 @@ typedef struct mvrlu_thread_struct mvrlu_thread_struct_t;
 int mvrlu_init(void);
 void mvrlu_finish(void);
 void mvrlu_print_stats(void);
+int mvrlu_is_init(void);
 
 mvrlu_thread_struct_t *mvrlu_thread_alloc(void);
 void mvrlu_thread_free(mvrlu_thread_struct_t *self);

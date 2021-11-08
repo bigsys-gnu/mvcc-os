@@ -59,15 +59,9 @@ namespace mvrlu {
 
   class thread_handle {
   public:
-    thread_handle(void) {
-      self_ = ::mvrlu_thread_alloc();
-      ::mvrlu_thread_init(self_);
-    }
+    thread_handle(void);
 
-    ~thread_handle(void) {
-      ::mvrlu_thread_finish(self_);
-      ::mvrlu_thread_free(self_);
-    }
+    ~thread_handle(void);
 
     NEW_DELETE_OPS(thread_handle);
 
