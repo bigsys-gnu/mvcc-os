@@ -5,25 +5,15 @@
 #include "types.h"
 #include "amd64.h"
 #include "kernel.hh"
-#include "mmu.h"
 #include "spinlock.hh"
 #include "condvar.hh"
 #include "proc.hh"
 #include "cpu.hh"
-#include "vm.hh"
-#include "kmtrace.hh"
-#include "futex.h"
-#include "version.hh"
-#include "filetable.hh"
 #include "sorted_chainhash.hh"
 #include "mvrlu/mvrlu.hh"
 #include "chainhash_spinlock.hh"
 #include "mvcc_kernel_bench.h"
 #include "hash.hh"
-
-#include <uk/mman.h>
-#include <uk/utsname.h>
-#include <uk/unistd.h>
 
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
 template <typename T>
@@ -588,7 +578,7 @@ public:
           goto restart;
         }
         auto new_node = new mvrlu_node(key);
-        mvrlu::mvrlu_assign_pointer(&new_node->next, prev->next);
+        mvrlu::mvrlu_assign_pointer(&new_node->next, cur);
         mvrlu::mvrlu_assign_pointer(&prev->next, new_node);
         ret = 1;
         break;
