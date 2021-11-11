@@ -260,6 +260,7 @@ endif
 
 # User-provided QEMU options
 QEMUOPTS += $(QEMUEXTRA)
+QEMUOPTS += -enable-kvm
 
 qemu: $(KERN)
 	$(QEMU) $(QEMUOPTS) $(QEMUKVMFLAGS) -kernel $(KERN)

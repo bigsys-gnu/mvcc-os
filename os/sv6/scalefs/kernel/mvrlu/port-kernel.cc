@@ -1,3 +1,4 @@
+#include "mvrlu/port_data.h"
 #include "types.h"
 #include "kernel.hh"
 #include "spinlock.hh"
@@ -8,6 +9,7 @@
 #include "cpu.hh"
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
+#include "mvrlu/log_allocator.hh"
 
 #if SPINLOCK_DEBUG
 #define lock_print(lock)\
@@ -18,6 +20,7 @@
 #define lock_print(lock)
 #endif
 
+
 #define GET_MEM(PTR) \
   ((struct alloc_mem *) (((char *) PTR) - sizeof(unsigned long)))
 
@@ -25,11 +28,12 @@
 /*
  * Log region
  */
-static unsigned long g_size __read_mostly;
+mvrlu::log_allocator log_pool;
+// static unsigned long g_size __read_mostly;
 
 int port_log_region_init(unsigned long size, unsigned long num)
 {
-  g_size = size;
+  // g_size = size;
   return 0;
 }
 
@@ -40,18 +44,21 @@ void port_log_region_destroy(void)
 
 void *port_alloc_log_mem(void)
 {
-  return vmalloc_raw(g_size, 4, "port log");
+  // return vmalloc_raw(g_size, 4, "port log");
+  return log_pool.alloc_log_mem();
 }
 
 void port_free_log_mem(void *addr)
 {
-  vmalloc_free(addr);
+  // vmalloc_free(addr);
+  log_pool.free_log_mem(addr);
 }
 
 int port_addr_in_log_region(void *addr__)
 {
-  unsigned long long addr = (unsigned long long)addr__;
-  return addr >= KVMALLOC && addr < KVMALLOCEND;
+  // unsigned long long addr = (unsigned long long)addr__;
+  // return addr >= KVMALLOC && addr < KVMALLOCEND;
+  return log_pool.addr_in_log_region(addr__);
 }
 
 /*
@@ -176,13 +183,19 @@ int port_create_thread(const char *name, struct task_struct **t,
                        void (*fn)(void *), void *arg,
                        struct completion *completion)
 {
-  struct proc *temp = threadpin(fn, arg, name, 0);
-  if (temp != NULL)
+  struct proc *temp = threadalloc(fn, arg);
+  if (temp != nullptr)
   {
+    snprintf(temp->name, sizeof(temp->name), "%s", name);
+    temp->cpu_pin = 0;
     port_cond_init(completion);
     *t = (struct task_struct *)temp;
+    scoped_acquire l(&temp->lock);
+    addrun(temp);
+
     return 0;
   }
+
   return -11;
 }
 
