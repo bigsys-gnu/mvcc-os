@@ -157,7 +157,7 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
           new_node->value = key;
 
           /* insert node */
-          RLU_ASSIGN_PTR(self, &new_node->next, prev->next);
+          RLU_ASSIGN_PTR(self, &new_node->next, cur);
           RLU_ASSIGN_PTR(self, &prev->next, new_node);
           ret = 1;
 		      break;
