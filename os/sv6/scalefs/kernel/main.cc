@@ -233,9 +233,10 @@ cmain(u64 mbmagic, u64 mbaddr)
   initz();
   initproc();      // process table
   initsched();     // scheduler run queues
-  initidle();
   initgc();        // gc epochs and threads
   initrefcache();  // Requires initsched
+  mvrlu_init();    // before first process creation.
+  initidle();
   initconsole();
   initfutex();
   initsamp();
@@ -275,8 +276,6 @@ cmain(u64 mbmagic, u64 mbaddr)
 #if DEBUG
   cprintf("Running in DEBUG mode\n");
 #endif
-
-  // mvrlu_init();
 
   idleloop();
 

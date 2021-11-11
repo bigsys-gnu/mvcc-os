@@ -6,8 +6,6 @@ extern "C" {
 #endif
 
 #ifndef __KERNEL__
-#include <stdio.h>
-#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <stdint.h>
@@ -47,11 +45,6 @@ extern "C" {
 
 #ifndef __packed
 #define __packed __attribute__((packed))
-#endif
-
-#ifndef static_assert
-#define static_assert(e) (sizeof(struct { int : (-!(e)); }))
-#define static_assert_msg(e, msg) static_assert(e)
 #endif
 
 static inline void __attribute__((__always_inline__)) smp_mb(void)

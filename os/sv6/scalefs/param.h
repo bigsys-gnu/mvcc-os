@@ -74,6 +74,9 @@
 // Configuring MEMIDE/AHCIIDE in param.h is deprecated.
 // Use include/ideconfig.hh instead.
 
+// use MVRLU on Scalefs
+#define USE_MVRLU_SCALEFS 0
+
 //
 // QEMU-based targets
 //

@@ -9,6 +9,8 @@
 #define printf(...)\
   port_print_str(__VA_ARGS__)
 #else
+#include <stdio.h>
+#include <stdlib.h>
 #include "mvrlu/port-user.h"
 #endif
 
@@ -1323,13 +1325,16 @@ int mvrlu_init(void)
 	return 0;
 }
 
+int mvrlu_is_init(void) {
+  return init;
+}
+
 void mvrlu_finish(void)
 {
 	finish_qp_thread(&g_qp_thread);
 	thread_list_destroy(&g_live_threads);
 	thread_list_destroy(&g_zombie_threads);
 	port_log_region_destroy();
-    smp_cas(&init, 1, 0);
 }
 
 mvrlu_thread_struct_t *mvrlu_thread_alloc(void)
