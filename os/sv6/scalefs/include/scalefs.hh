@@ -834,10 +834,17 @@ class mfs_interface
     sref<mnode> load_dir_entry(u64 inum, sref<mnode> parent);
     sref<mnode> mnode_alloc(u64 inum, u8 mtype);
     sref<inode> get_inode(u64 mnum, const char *str);
+#if USE_MVRLU_SCALEFS
     // Mapping from disk inode numbers to the corresponding mnode numbers
     mvrlu::chainhash<u64, u64> *inum_to_mnum;
     // Mapping from in-memory mnode numbers to disk inode numbers
     mvrlu::chainhash<u64, u64> *mnum_to_inum;
+    // Mapping from disk inode numbers to the corresponding mnode numbers
+#else
+    chainhash<u64, u64> *inum_to_mnum;
+    // Mapping from in-memory mnode numbers to disk inode numbers
+    chainhash<u64, u64> *mnum_to_inum;
+#endif
     chainhash<u64, sleeplock*> *mnum_to_lock;
     chainhash<u64, strbuf<DIRSIZ>> *mnum_to_name;
 

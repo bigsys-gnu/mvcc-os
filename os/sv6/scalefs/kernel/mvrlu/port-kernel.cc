@@ -10,6 +10,7 @@
 #include "mvrlu/arch.h"
 #include "mvrlu/port-kernel.h"
 #include "mvrlu/log_allocator.hh"
+#include "mvrlu/config.h"
 
 #if SPINLOCK_DEBUG
 #define lock_print(lock)\
@@ -28,12 +29,17 @@
 /*
  * Log region
  */
+#if MVRLU_USE_VMALLOC
+static unsigned long g_size __read_mostly;
+#else
 mvrlu::log_allocator log_pool;
-// static unsigned long g_size __read_mostly;
+#endif
 
 int port_log_region_init(unsigned long size, unsigned long num)
 {
-  // g_size = size;
+#if MVRLU_USE_VMALLOC
+  g_size = size;
+#endif
   return 0;
 }
 
@@ -44,21 +50,30 @@ void port_log_region_destroy(void)
 
 void *port_alloc_log_mem(void)
 {
-  // return vmalloc_raw(g_size, 4, "port log");
+#if MVRLU_USE_VMALLOC
+  return vmalloc_raw(g_size, 4, "port log");
+#else
   return log_pool.alloc_log_mem();
+#endif
 }
 
 void port_free_log_mem(void *addr)
 {
-  // vmalloc_free(addr);
+#if MVRLU_USE_VMALLOC
+  vmalloc_free(addr);
+#else
   log_pool.free_log_mem(addr);
+#endif
 }
 
 int port_addr_in_log_region(void *addr__)
 {
-  // unsigned long long addr = (unsigned long long)addr__;
-  // return addr >= KVMALLOC && addr < KVMALLOCEND;
+#if MVRLU_USE_VMALLOC
+  unsigned long long addr = (unsigned long long)addr__;
+  return addr >= KVMALLOC && addr < KVMALLOCEND;
+#else
   return log_pool.addr_in_log_region(addr__);
+#endif
 }
 
 /*

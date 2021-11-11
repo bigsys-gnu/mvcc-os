@@ -277,8 +277,6 @@ cmain(u64 mbmagic, u64 mbaddr)
   cprintf("Running in DEBUG mode\n");
 #endif
 
-  // mvrlu_init();
-
   idleloop();
 
   panic("Unreachable");

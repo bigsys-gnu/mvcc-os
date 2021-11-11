@@ -14,8 +14,13 @@ mfs_interface::mfs_interface()
   for (int cpu = 0; cpu < NCPU; cpu++)
     fs_journal[cpu] = new journal();
 
+#if USE_MVRLU_SCALEFS
   inum_to_mnum = new mvrlu::chainhash<u64, u64>(NINODES_PRIME);
   mnum_to_inum = new mvrlu::chainhash<u64, u64>(NINODES_PRIME);
+#else
+  inum_to_mnum = new chainhash<u64, u64>(NINODES_PRIME);
+  mnum_to_inum = new chainhash<u64, u64>(NINODES_PRIME);
+#endif
   mnum_to_lock = new chainhash<u64, sleeplock*>(NINODES_PRIME);
   mnum_to_name = new chainhash<u64, strbuf<DIRSIZ>>(NINODES_PRIME); // Debug
   metadata_log_htab = new chainhash<u64, mfs_logical_log*>(NINODES_PRIME);
