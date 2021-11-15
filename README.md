@@ -55,7 +55,7 @@ great results.
 
 Scalefs Booting Screen (QEMU)
 ------------------------
-![](./booting_screen.png) 
+![](./doc/booting_screen.png) 
 
 
 Building and running sv6 in QEMU
