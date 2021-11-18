@@ -4,26 +4,18 @@
 
 #include "types.h"
 #include "amd64.h"
+#include "compiler.h"
 #include "kernel.hh"
-#include "mmu.h"
 #include "spinlock.hh"
 #include "condvar.hh"
 #include "proc.hh"
 #include "cpu.hh"
-#include "vm.hh"
-#include "kmtrace.hh"
-#include "futex.h"
 #include "version.hh"
-#include "filetable.hh"
 #include "mvrlu/mvrlu.hpp"
 #include "sorted_chainhash.hh"
 #include "chainhash_spinlock.hh"
 #include "mvcc_kernel_bench.h"
 #include "hash.hh"
-
-#include <uk/mman.h>
-#include <uk/utsname.h>
-#include <uk/unistd.h>
 
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
 template <typename T>
@@ -49,6 +41,7 @@ struct bench_trait {
 /////////////////////////////////////
 condvar thread_bar("barrier");
 spinlock bar_lock("barrier");
+int stop = 0;             // shared by threads
 
 void wait_on_barrier(void) {
   scoped_acquire l(&bar_lock);
@@ -105,7 +98,6 @@ static inline int rand_range(int n, unsigned short *seed)
   return v;
 }
 ////////////////////////////////////////////////////////
-int stop = 0;             // shared by threads
 
 struct node {
   node *next;
@@ -172,15 +164,14 @@ struct thread_param {
   unsigned long result_remove;
   unsigned long result_contains;
   unsigned long result_found;
-  int &stop;
   unsigned short seed[3];
   typename T::data_structure *hl;
 
   thread_param(int n_buckets, int nb_threads, int update, int range,
-               int &stop, typename T::data_structure *hl)
+               typename T::data_structure *hl)
     :n_buckets(n_buckets), nb_threads(nb_threads), update(update),
      range(range), variation(0), result_add(0), result_remove(0),
-     result_contains(0), result_found(0), stop(stop), hl(hl) {
+     result_contains(0), result_found(0), hl(hl) {
     rand_init(seed);
   }
 
@@ -324,7 +315,7 @@ void test<spinlock_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -401,7 +392,7 @@ void test<rcu_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -475,7 +466,7 @@ void test<spin_chain_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -696,7 +687,7 @@ void test<mvrlu_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -768,7 +759,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   for (int i = 0; i < nb_threads; i++)
   {
     param_list[i] = new thread_param<T>(n_buckets, nb_threads, update,
-                                               range, stop, hl);
+                                               range, hl);
   }
   for (int i = 0; i < nb_threads; i++)
   {
@@ -784,7 +775,8 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 
   sleep_usec(nsectime(), duration);
 
-  stop = 1;
+  barrier();
+  *((volatile int *)&stop) = 1;
   cprintf("join %d threads...\n", nb_threads);
 
   sleep_usec(nsectime(), 6000); // wait for threads
@@ -848,7 +840,7 @@ sys_benchmark(void *arguments, void *retptr)
   default:
     cprintf("Wrong sync type! 0:spinlock 1:mvrlu 2:rcu+seqlock\n");
   }
-  stop = 0;
+  *((volatile int *)&stop) = 0;
   cprintf("Kernel Level Benchmark END\n");
 }
 //////////////////////////////////////
