@@ -39,12 +39,13 @@ namespace mvrlu {
   class thread_handle {
   public:
     thread_handle(void) {
-      ::mvrlu_thread_init(&self_);
+      self_ = ::mvrlu_thread_alloc();
+      ::mvrlu_thread_init(self_);
     }
 
     ~thread_handle(void) {
-      ::mvrlu_thread_finish(&self_);
-      ::mvrlu_thread_free(&self_);
+      ::mvrlu_thread_finish(self_);
+      ::mvrlu_thread_free(self_);
     }
 
     // don't deallocate memory right away
@@ -65,36 +66,36 @@ namespace mvrlu {
 
     inline void
     mvrlu_reader_lock(void) {
-      ::mvrlu_reader_lock(&self_);
+      ::mvrlu_reader_lock(self_);
     }
 
     inline void
     mvrlu_reader_unlock(void) {
-      ::mvrlu_reader_unlock(&self_);
+      ::mvrlu_reader_unlock(self_);
     }
 
     inline bool
     mvrlu_try_lock(T** p_p_obj) {
       if (!*p_p_obj)
         return true;
-      return ::_mvrlu_try_lock(&self_, (void **)p_p_obj, sizeof(T));
+      return ::_mvrlu_try_lock(self_, (void **)p_p_obj, sizeof(T));
     }
 
     inline bool
     mvrlu_try_lock_const(T* obj) {
       if (!obj)
         return true;
-      return ::_mvrlu_try_lock_const(&self_, (void *)obj, sizeof(T));
+      return ::_mvrlu_try_lock_const(self_, (void *)obj, sizeof(T));
     }
 
     inline void
     mvrlu_abort(void) {
-      ::mvrlu_abort(&self_);
+      ::mvrlu_abort(self_);
     }
 
     inline T*
     mvrlu_deref(T *p_obj) {
-      return (T *) ::mvrlu_deref(&self_, (void *)p_obj);
+      return (T *) ::mvrlu_deref(self_, (void *)p_obj);
     }
 
     // need hotfix!!!
@@ -103,11 +104,11 @@ namespace mvrlu {
     // -> mvrlu.c need to be fixed using template?
     inline void
     mvrlu_free(T *p_obj) {
-      ::mvrlu_free(&self_, (void *)p_obj);
+      ::mvrlu_free(self_, (void *)p_obj);
     }
 
   private:
-    mvrlu_thread_struct_t self_;
+    mvrlu_thread_struct_t *self_;
     friend class mvrlu_object<T>;
   };
 

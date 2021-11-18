@@ -580,7 +580,7 @@ public:
           goto restart;
         }
         auto new_node = new mvrlu_node(key);
-        mvrlu::mvrlu_assign_pointer(&new_node->next, prev->next);
+        mvrlu::mvrlu_assign_pointer(&new_node->next, cur);
         mvrlu::mvrlu_assign_pointer(&prev->next, new_node);
         ret = 1;
         break;
@@ -787,7 +787,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   stop = 1;
   cprintf("join %d threads...\n", nb_threads);
 
-  sleep_usec(nsectime(), 4000); // wait for threads
+  sleep_usec(nsectime(), 6000); // wait for threads
 
   bench_finish<T>();
   cprintf(" done!\n");
