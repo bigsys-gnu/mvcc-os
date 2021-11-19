@@ -32,7 +32,7 @@
 
 #define RCU_MAX_FREE_PTRS (1000)
 #define MAX_SPIN_LOCKS (10)
-#define MAX_THREADS (35)
+#define MAX_THREADS (100)
 
 struct rcu_data {
   long *times;  
