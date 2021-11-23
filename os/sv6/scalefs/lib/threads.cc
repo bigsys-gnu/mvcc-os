@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: Copyright (c) 2021 Gyeongsang National University
+// //
+// // SPDX-License-Identifier: Apache 2.0
+
 #include "types.h"
 #include "pthread.h"
 #include "user.h"
