@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: Copyright (c) 2021 Gyeongsang National University
+// //
+// // SPDX-License-Identifier: Apache 2.0
+
 #ifndef _MVRLU_I_H
 #define _MVRLU_I_H
 #include "arch.h"

@@ -1,3 +1,7 @@
+// SPDX-FileCopyrightText: Copyright (c) 2021 Gyeongsang National University
+// //
+// // SPDX-License-Identifier: MIT
+
 #ifndef _K_RCU_H_
 #define _K_RCU_H_
 
