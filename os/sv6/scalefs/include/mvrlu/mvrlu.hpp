@@ -1,9 +1,10 @@
 #pragma once
 
+#include "config.h"
 #include "mvrlu.h"
 #include "mvrlu_i.h"
 #include "cpputil.hh"
-#include "mvrlu/port-kernel.h"
+#include "port-kernel.h"
 #include <cstddef>
 
 namespace mvrlu {

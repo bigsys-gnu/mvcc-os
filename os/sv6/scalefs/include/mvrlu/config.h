@@ -5,7 +5,7 @@
 #define DISABLE_MUNMAP
 #define MVRLU_ORDO_TIMESTAMPING	// ENABLE ORDO TIMESTAMP
 
-#define MVRLU_LOG_SIZE (1ul << 19) /* 512KB */
+#define MVRLU_LOG_SIZE (1ul << 17) /* 128KB */
 #define MVRLU_LOG_MASK (~(MVRLU_LOG_SIZE - 1))
 #define MVRLU_MAX_THREAD_NUM (1ul << 14) /* 16384 (2**18 * 2**14 = 2**32) */
 
@@ -22,4 +22,7 @@
 #define MVRLU_DEFAULT_PADDING CACHE_DEFAULT_PADDING
 //#define MVRLU_NESTED_LOCKING
 //#define MVRLU_ENABLE_STATS
+
+#define MVRLU_USE_VMALLOC 0
+
 #endif /* _CONFIG_H */

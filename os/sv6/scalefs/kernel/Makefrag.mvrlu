@@ -2,7 +2,8 @@
 
 MVRLU_C = mvrlu
 
-MVRLU_CPP = port-kernel
+MVRLU_CPP += port-kernel
+MVRLU_CPP += log_allocator
 MVRLU_OBJS = $(addsuffix .o, ${MVRLU_C} ${MVRLU_CPP})
 MVRLU_OBJS := $(addprefix mvrlu/, ${MVRLU_OBJS})
 MVRLU_OBJS := $(addprefix $(O)/kernel/, ${MVRLU_OBJS})
