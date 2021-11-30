@@ -44,7 +44,7 @@ static inline unsigned long ordo_get_clock(void)
 {
 	/* rdtscp() is a serializing variant, which is not
 	 * reordered in an instruction pipeline. */
-  #ifdef HW_lucoms
+  #ifdef HW_josmp
   return rdtscp();
   #else
   return rdtsc_serialized();
