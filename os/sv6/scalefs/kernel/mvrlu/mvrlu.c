@@ -26,6 +26,7 @@ static inline void *port_alloc(size_t size)
 static mvrlu_thread_list_t g_live_threads ____cacheline_aligned2;
 static mvrlu_thread_list_t g_zombie_threads ____cacheline_aligned2;
 static mvrlu_qp_thread_t g_qp_thread ____cacheline_aligned2;
+static unsigned int until_counter ____cacheline_aligned2 = 1000;
 
 #ifdef MVRLU_ENABLE_STATS
 static mvrlu_stat_t g_stat ____cacheline_aligned2;
@@ -985,7 +986,7 @@ static void log_reclaim_force(mvrlu_log_t *log)
 			port_cpu_relax_and_yield();
 			smp_mb();
 			count++;
-			if (count == 1000) {
+			if (count > until_counter) {
 				wakeup_qp_thread_for_reclaim();
 				count = 0;
 			}
@@ -1321,6 +1322,14 @@ int mvrlu_init(void)
 	}
 
 	return 0;
+}
+
+int mvrlu_is_init(void) {
+  return init;
+}
+
+void change_mvrlu_until(unsigned int new_until) {
+  until_counter = new_until;
 }
 
 void mvrlu_finish(void)

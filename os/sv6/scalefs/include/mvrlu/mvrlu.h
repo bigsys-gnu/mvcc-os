@@ -49,6 +49,7 @@ void _mvrlu_assign_pointer(void **p_ptr, void *p_obj);
 void *mvrlu_deref(mvrlu_thread_struct_t *self, void *p_obj);
 
 void mvrlu_flush_log(mvrlu_thread_struct_t *self);
+void change_mvrlu_until(unsigned int new_until);
 
 #ifndef __cplusplus
 #define mvrlu_try_lock(self, p_p_obj)                                          \

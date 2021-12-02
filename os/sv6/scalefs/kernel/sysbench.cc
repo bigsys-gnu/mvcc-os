@@ -883,3 +883,9 @@ void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[]
   retptr->total_read = reads;
   retptr->total_update = updates;
 }
+
+//SYSCALL
+void
+sys_mvrlu_until(unsigned int until) {
+  change_mvrlu_until(until);
+}
