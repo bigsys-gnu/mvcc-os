@@ -136,29 +136,6 @@ typedef struct rlu_thread_data {
 	intptr_t *free_nodes[RLU_MAX_FREE_NODES];
 
 	long padding_5[RLU_DEFAULT_PADDING];
-
-	long n_starts;
-	long n_finish;
-	long n_writers;
-	long n_writer_writeback;
-	long n_pure_readers;
-	long n_aborts;
-	long n_steals;
-	long n_writer_sync_waits;
-	long n_writeback_q_iters;
-	long n_sync_requests;
-	long n_sync_and_writeback;
-
-	long padding_6[RLU_DEFAULT_PADDING];
-
-#ifdef RLU_TIME_MEASUREMENT
-	ticks t_begin;
-	ticks t_end;
-	ticks t_writeback_spent;
-	ticks t_blocking_spent;
-	long padding_7[RLU_DEFAULT_PADDING];
-#endif
-
 } rlu_thread_data_t;
 
 /////////////////////////////////////////////////////////////////////////////////////////

@@ -134,8 +134,10 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
  restart:
   RLU_READER_LOCK(self);
 
-  for (prev = (node_t *)RLU_DEREF(self, list->head), cur = (node_t *)RLU_DEREF(self, prev->next); ;
-	   prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
+  prev = (node_t *)RLU_DEREF(self, list->head); 
+  cur = (node_t *)RLU_DEREF(self, prev->next);
+
+  for (;; prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
     {
       if (cur == NULL || cur->value > key)
         {
@@ -145,20 +147,25 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
               RLU_ABORT(self);
               goto restart;
             }
+          if (cur && !RLU_TRY_LOCK(self, &cur))
+            {
+              RLU_ABORT(self);
+              goto restart;
+            }
           /* initialize node */
           new_node = (node_t *) RLU_ALLOC(sizeof(node_t));
           new_node->value = key;
 
           /* insert node */
-          RLU_ASSIGN_PTR(self, &new_node->next, prev->next);
+          RLU_ASSIGN_PTR(self, &new_node->next, cur);
           RLU_ASSIGN_PTR(self, &prev->next, new_node);
           ret = 1;
-		  break;
+          break;
         }
       else if (cur->value == key)
-        {
-          break;             /* the key value already exists. */
-        }
+      {
+        break;             /* the key value already exists. */
+      }
     }
 
   RLU_READER_UNLOCK(self);
@@ -173,8 +180,11 @@ int list_delete(rlu_thread_data_t *self, int key, list_t *list)
  restart:
   RLU_READER_LOCK(self);
 
-  for (prev = (node_t *)RLU_DEREF(self, list->head), cur = (node_t *)RLU_DEREF(self, prev->next);
-       cur != NULL; prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
+  prev = (node_t *)RLU_DEREF(self, list->head);
+  cur = (node_t *)RLU_DEREF(self, prev->next);
+
+  for ( ; cur != NULL; 
+         prev = cur, cur = (node_t *)RLU_DEREF(self, cur->next))
     {
       /* found the target to be trashed. */
       if (cur->value == key)
