@@ -8,14 +8,31 @@
 // INCLUDES
 /////////////////////////////////////////////////////////////////////////////////////////
 
+#ifndef KERNEL
 # include <stdio.h>
 # include <stdlib.h>
 # include <string.h>
 # include <time.h>
 # define likely(x) __builtin_expect ((x), 1)
 # define unlikely(x) __builtin_expect ((x), 0)
+#else /* KERNEL */
+# include <linux/printk.h>
+# include <linux/string.h>
+# include <linux/slab.h>
+# include <linux/bug.h>
+# define printf(...) pr_info(__VA_ARGS__)
+/* TODO */
+# define printf_err(...) pr_err(__VA_ARGS__)
+# define fprintf(arg, ...) pr_err(__VA_ARGS__)
+# define free(ptr) kfree(ptr)
+# define malloc(size) kmalloc(size, GFP_KERNEL)
+#endif /* KERNEL */
 
 #include "rlu.h"
+
+#ifdef RLU_ORDO_TIMESTAMPING
+# include "ordo_clock.h"
+#endif
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // DEFINES - GENERAL
@@ -74,19 +91,20 @@
 // DEFINES - ATOMICS
 /////////////////////////////////////////////////////////////////////////////////////////
 /* TODO for PPC */
-#ifndef asm
-#define asm __asm__
-#endif
-
-#ifndef abort
-#define abort()\
-  exit(1);
-#endif
-
-#define CPU_RELAX() asm volatile("pause\n": : :"memory");
+#define CPU_RELAX() __asm__ volatile("pause\n": : :"memory");
 #define MEMBARSTLD() __sync_synchronize()
 #define FETCH_AND_ADD(addr, v) __sync_fetch_and_add((addr), (v))
 #define CAS(addr, expected_value, new_value) __sync_val_compare_and_swap((addr), (expected_value), (new_value))
+
+#ifdef RLU_TIME_MEASUREMENT 
+static inline uint64_t __attribute__((__always_inline__))
+__read_tsc(void)
+{
+        uint32_t a, d;
+        __asm __volatile("rdtsc" : "=a" (a), "=d" (d));
+        return ((uint64_t) a) | (((uint64_t) d) << 32);
+}
+#endif
 
 #ifndef smp_swap
 #define smp_swap(__ptr, __val)			\
@@ -111,7 +129,6 @@
     if (unlikely(!(cond))) { \
         printf ("\n-----------------------------------------------\n"); \
         printf ("\nAssertion failure: %s:%d '%s'\n", __FILE__, __LINE__, #cond); \
-        abort(); \
     }
 
 #define RLU_ASSERT_MSG(cond, self, fmt, ...) \
@@ -119,7 +136,6 @@
         printf ("\n-----------------------------------------------\n"); \
         printf ("\nAssertion failure: %s:%d '%s'\n", __FILE__, __LINE__, #cond); \
         RLU_TRACE(self, fmt, __VA_ARGS__); \
-        abort(); \
     }
 
 #ifdef RLU_ENABLE_TRACE_1
@@ -145,24 +161,10 @@
 /////////////////////////////////////////////////////////////////////////////////////////
 // TYPES
 /////////////////////////////////////////////////////////////////////////////////////////
-typedef struct rlu_data {
-	volatile long n_starts;
-	volatile long n_finish;
-	volatile long n_writers;
-
-	volatile long n_writer_writeback;
-	volatile long n_writeback_q_iters;
-	volatile long n_pure_readers;
-	volatile long n_steals;
-	volatile long n_aborts;
-	volatile long n_sync_requests;
-	volatile long n_sync_and_writeback;
-} rlu_data_t;
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // GLOBALS
 /////////////////////////////////////////////////////////////////////////////////////////
-static volatile rlu_data_t g_rlu_data = {0,};
 
 static volatile int g_rlu_type = 0;
 static volatile int g_rlu_max_write_sets = 0;
@@ -170,19 +172,80 @@ static volatile int g_rlu_max_write_sets = 0;
 static volatile long g_rlu_cur_threads = 0;
 static volatile rlu_thread_data_t *g_rlu_threads[RLU_MAX_THREADS] = {0,};
 
+static volatile long g_rlu_writer_locks[RLU_MAX_WRITER_LOCKS] = {0,};
+
+#ifndef RLU_ORDO_TIMESTAMPING
 static volatile unsigned long g_rlu_array[RLU_CACHE_LINE_SIZE * 64] = {0,};
 
 #define g_rlu_writer_version g_rlu_array[RLU_CACHE_LINE_SIZE * 2]
 #define g_rlu_commit_version g_rlu_array[RLU_CACHE_LINE_SIZE * 4]
+#endif
 
 
 /////////////////////////////////////////////////////////
 // HELPER FUNCTIONS
 /////////////////////////////////////////////////////////
+#ifdef KERNEL
+static void abort(void)
+{
+	BUG();
+	/* if that doesn't kill us, halt */
+	panic("Oops failed to kill thread");
+}
+#endif /* KERNEL */
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // INTERNAL FUNCTIONS
 /////////////////////////////////////////////////////////////////////////////////////////
+
+/////////////////////////////////////////////////////////////////////////////////////////
+// Writer locks
+/////////////////////////////////////////////////////////////////////////////////////////
+static void rlu_reset_writer_locks(rlu_thread_data_t *self, long ws_id) {
+	self->obj_write_set[ws_id].writer_locks.size = 0;
+}
+
+static void rlu_add_writer_lock(rlu_thread_data_t *self, long writer_lock_id) {
+	int i;
+	long n_locks;
+	
+	n_locks = self->obj_write_set[self->ws_cur_id].writer_locks.size;
+	for (i = 0; i < n_locks; i++) {
+		RLU_ASSERT(self->obj_write_set[self->ws_cur_id].writer_locks.ids[i] != writer_lock_id);
+	}
+	
+	self->obj_write_set[self->ws_cur_id].writer_locks.ids[n_locks] = writer_lock_id;
+	self->obj_write_set[self->ws_cur_id].writer_locks.size++;
+	
+	RLU_ASSERT(self->obj_write_set[self->ws_cur_id].writer_locks.size < RLU_MAX_NESTED_WRITER_LOCKS);
+}
+
+static int rlu_try_acquire_writer_lock(rlu_thread_data_t *self, long writer_lock_id) {
+	volatile long cur_lock;
+	
+	cur_lock = g_rlu_writer_locks[writer_lock_id];
+	if (cur_lock == 0) {
+		if (CAS(&g_rlu_writer_locks[writer_lock_id], 0, LOCK_ID(self->uniq_id)) == 0) {
+			return 1;
+		}
+	}
+	
+	return 0;	
+}
+
+static void rlu_release_writer_lock(rlu_thread_data_t *self, long writer_lock_id) {
+	RLU_ASSERT(g_rlu_writer_locks[writer_lock_id] == LOCK_ID(self->uniq_id));
+	
+	g_rlu_writer_locks[writer_lock_id] = 0;
+}
+
+static void rlu_release_writer_locks(rlu_thread_data_t *self, int ws_id) {
+	int i;
+	
+	for (i = 0; i < self->obj_write_set[ws_id].writer_locks.size; i++) {
+		rlu_release_writer_lock(self, self->obj_write_set[ws_id].writer_locks.ids[i]);
+	}
+}
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // Write-set processing
@@ -200,6 +263,7 @@ static void rlu_reset_write_set(rlu_thread_data_t *self, long ws_counter) {
 	self->obj_write_set[ws_id].num_of_objs = 0;
 	self->obj_write_set[ws_id].p_cur = (intptr_t *)&(self->obj_write_set[ws_id].buffer[0]);
 	
+	rlu_reset_writer_locks(self, ws_id);
 }
 
 static intptr_t *rlu_add_ws_obj_header_to_write_set(rlu_thread_data_t *self, intptr_t *p_obj, obj_size_t obj_size) {
@@ -303,11 +367,19 @@ static int rlu_writeback_write_sets_and_unlock(rlu_thread_data_t *self) {
 	}
 
 	self->ws_head_counter = self->ws_wb_counter;
+
+#ifdef RLU_TIME_MEASUREMENT
+	self->t_begin = __read_tsc();
+#endif
 	ws_wb_num = 0;
 	for (ws_counter = self->ws_wb_counter; ws_counter < self->ws_tail_counter; ws_counter++) {
 		rlu_writeback_write_set(self, ws_counter);
 		ws_wb_num++;
 	}
+#ifdef RLU_TIME_MEASUREMENT
+	self->t_end = __read_tsc();
+	self->t_writeback_spent += self->t_end - self->t_begin; 
+#endif
 	self->ws_wb_counter = self->ws_tail_counter;
 
 	return ws_wb_num;
@@ -363,8 +435,12 @@ static void rlu_register_thread(rlu_thread_data_t *self) {
 	RLU_ASSERT((self->run_counter & 0x1) == 0);
 
 	FETCH_AND_ADD(&self->run_counter, 1);
+#ifndef RLU_ORDO_TIMESTAMPING
 	self->local_version = g_rlu_writer_version;
 	self->local_commit_version = g_rlu_commit_version;
+#else
+	self->local_version = ordo_get_clock();
+#endif
 }
 
 static void rlu_unregister_thread(rlu_thread_data_t *self) {
@@ -447,12 +523,24 @@ static long rlu_wait_for_quiescence(rlu_thread_data_t *self, unsigned long versi
 				self->q_threads[th_id].is_wait = 0;
 				break;
 			}
+#ifndef RLU_ORDO_TIMESTAMPING
 			if (version_limit) {
 				if (g_rlu_threads[th_id]->local_version >= version_limit) {
 					self->q_threads[th_id].is_wait = 0;
 					break;
 				}
 			}
+#else
+			if (version_limit) {
+				int rc = ordo_cmp_clock(
+					g_rlu_threads[th_id]->local_version,
+					version_limit);
+				if (rc == ORDO_GREATER_THAN) {
+					self->q_threads[th_id].is_wait = 0;
+					break;
+				}
+			}
+#endif
 
 			if (iters > Q_ITERS_LIMIT) {
 				iters = 0;
@@ -470,16 +558,12 @@ static long rlu_wait_for_quiescence(rlu_thread_data_t *self, unsigned long versi
 }
 
 static void rlu_synchronize(rlu_thread_data_t *self) {
-	long q_iters;
-
 	if (self->is_no_quiescence) {
 		return;
 	}
 
 	rlu_init_quiescence(self);
-	q_iters = rlu_wait_for_quiescence(self, self->writer_version);
-
-	self->n_writeback_q_iters += q_iters;
+	rlu_wait_for_quiescence(self, self->writer_version);
 }
 
 static void rlu_sync_and_writeback(rlu_thread_data_t *self) {
@@ -492,22 +576,43 @@ static void rlu_sync_and_writeback(rlu_thread_data_t *self) {
 		return;
 	}
 
-	self->n_sync_and_writeback++;
-
 	ws_num = self->ws_tail_counter - self->ws_wb_counter;
 
+#ifndef RLU_ORDO_TIMESTAMPING
 	self->writer_version = g_rlu_writer_version + 1;
 	FETCH_AND_ADD(&g_rlu_writer_version, 1);
+#else
+	/* # NOTE 1.
+	 * - Update interval of an object should be greater than
+	 * 2x ordo boundary to dereference consistent snapshot
+	 * without abort.
+	 *
+	 * # NOTE 2.
+	 * - It is better to update self->writer_version
+	 * using an atomic swap operation to immediately
+	 * make its change public. */
+	smp_swap(&self->writer_version,
+		 ordo_new_clock(self->local_version + g_ordo_boundary));
+#endif
+	TRACE_1(self, "start, ws_num = %ld writer_version = %ld\n",
+		ws_num, self->writer_version);
 
+#ifdef RLU_TIME_MEASUREMENT
+	self->t_begin = __read_tsc();
+#endif
 	rlu_synchronize(self);
-
+#ifdef RLU_TIME_MEASUREMENT
+	self->t_end = __read_tsc();
+	self->t_blocking_spent += self->t_end - self->t_begin; 
+#endif
 	ws_wb_num = rlu_writeback_write_sets_and_unlock(self);
 
 	RLU_ASSERT_MSG(ws_num == ws_wb_num, self, "failed: %ld != %ld\n", ws_num, ws_wb_num);
 
 	self->writer_version = MAX_VERSION;
-
+#ifndef RLU_ORDO_TIMESTAMPING
 	FETCH_AND_ADD(&g_rlu_commit_version, 1);
+#endif
 
 	if (self->is_sync) {
 		self->is_sync = 0;
@@ -523,9 +628,6 @@ static void rlu_send_sync_request(int other_th_id) {
 }
 
 static void rlu_commit_write_set(rlu_thread_data_t *self) {
-	self->n_writers++;
-	self->n_writer_writeback++;
-
 	// Move to the next write-set
 	self->ws_tail_counter++;
 	self->ws_cur_id = WS_INDEX(self->ws_tail_counter);
@@ -546,16 +648,23 @@ static void rlu_commit_write_set(rlu_thread_data_t *self) {
 // EXTERNAL FUNCTIONS
 /////////////////////////////////////////////////////////////////////////////////////////
 void rlu_init_args(int type, int ws) {
+#ifndef RLU_ORDO_TIMESTAMPING
 	g_rlu_writer_version = 0;
 	g_rlu_commit_version = 0;
+#else
+	ordo_clock_init();
+#endif
 
-	if (type == RLU_TYPE_FINE_GRAINED) {
+	if (type == RLU_TYPE_COARSE_GRAINED) {
+		g_rlu_type = RLU_TYPE_COARSE_GRAINED;
+		g_rlu_max_write_sets = 1;
+		printf("RLU - COARSE_GRAINED initialized\n");
+	} else if (type == RLU_TYPE_FINE_GRAINED) {
 		g_rlu_type = RLU_TYPE_FINE_GRAINED;
 		g_rlu_max_write_sets = ws;
 		printf("RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
 	} else {
 		RLU_TRACE_GLOBAL("unknown type [%d]", RLU_TYPE);
-		abort();
 	}
 
 	RLU_ASSERT(RLU_MAX_WRITE_SETS >= 2);
@@ -565,16 +674,23 @@ void rlu_init_args(int type, int ws) {
 }
 
 void rlu_init(void) {
+#ifndef RLU_ORDO_TIMESTAMPING
 	g_rlu_writer_version = 0;
 	g_rlu_commit_version = 0;
+#else
+	ordo_clock_init();
+#endif
 
-	if (RLU_TYPE == RLU_TYPE_FINE_GRAINED) {
+	if (RLU_TYPE == RLU_TYPE_COARSE_GRAINED) {
+		g_rlu_type = RLU_TYPE_COARSE_GRAINED;
+		g_rlu_max_write_sets = 1;
+		printf("RLU - COARSE_GRAINED initialized\n");
+	} else if (RLU_TYPE == RLU_TYPE_FINE_GRAINED) {
 		g_rlu_type = RLU_TYPE_FINE_GRAINED;
 		g_rlu_max_write_sets = RLU_NUM_WS;
 		printf("RLU - FINE_GRAINED initialized [max_write_sets = %d]\n", g_rlu_max_write_sets);
 	} else {
 		RLU_TRACE_GLOBAL("unknown type [%d]", RLU_TYPE);
-		abort();
 	}
 
 	RLU_ASSERT(RLU_MAX_WRITE_SETS >= 2);
@@ -588,24 +704,13 @@ void rlu_print_stats(void) {
 	printf("=================================================\n");
 	printf("RLU statistics:\n");
 	printf("-------------------------------------------------\n");
-	printf("  t_starts = %lu\n", g_rlu_data.n_starts);
-	printf("  t_finish = %lu\n", g_rlu_data.n_finish);
-	printf("  t_writers = %lu\n", g_rlu_data.n_writers);
 	printf("-------------------------------------------------\n");
-	printf("  t_writer_writebacks = %lu\n", g_rlu_data.n_writer_writeback);
-	printf("  t_writeback_q_iters = %lu\n", g_rlu_data.n_writeback_q_iters);
-	if (g_rlu_data.n_writer_writeback > 0) {
-		printf("  a_writeback_q_iters = %lu\n", g_rlu_data.n_writeback_q_iters / g_rlu_data.n_writer_writeback);
-	} else {
-		printf("  a_writeback_q_iters = 0\n");
-	}
-	printf("  t_pure_readers         = %lu\n", g_rlu_data.n_pure_readers);
-	printf("  t_steals               = %lu\n", g_rlu_data.n_steals);
-	printf("  t_aborts               = %lu\n", g_rlu_data.n_aborts);
-	printf("  t_sync_requests        = %lu\n", g_rlu_data.n_sync_requests);
-	printf("  t_sync_and_writeback   = %lu\n", g_rlu_data.n_sync_and_writeback);
 
 	printf("=================================================\n");
+#ifdef RLU_TIME_MEASUREMENT
+	printf("  writeback_spent = %lld\n", g_rlu_data.t_writeback_spent / CLOCKS_PER_SEC);
+	printf("  blocking_spent = %lld\n", g_rlu_data.t_blocking_spent / CLOCKS_PER_SEC);
+#endif
 }
 
 void rlu_thread_init(rlu_thread_data_t *self) {
@@ -633,18 +738,6 @@ void rlu_thread_init(rlu_thread_data_t *self) {
 void rlu_thread_finish(rlu_thread_data_t *self) {
 	rlu_sync_and_writeback(self);
 	rlu_sync_and_writeback(self);
-
-	FETCH_AND_ADD(&g_rlu_data.n_starts, self->n_starts);
-	FETCH_AND_ADD(&g_rlu_data.n_finish, self->n_finish);
-	FETCH_AND_ADD(&g_rlu_data.n_writers, self->n_writers);
-	FETCH_AND_ADD(&g_rlu_data.n_writer_writeback, self->n_writer_writeback);
-	FETCH_AND_ADD(&g_rlu_data.n_writeback_q_iters, self->n_writeback_q_iters);
-	FETCH_AND_ADD(&g_rlu_data.n_pure_readers, self->n_pure_readers);
-	FETCH_AND_ADD(&g_rlu_data.n_steals, self->n_steals);
-	FETCH_AND_ADD(&g_rlu_data.n_aborts, self->n_aborts);
-	FETCH_AND_ADD(&g_rlu_data.n_sync_requests, self->n_sync_requests);
-	FETCH_AND_ADD(&g_rlu_data.n_sync_and_writeback, self->n_sync_and_writeback);
-
 }
 
 intptr_t *rlu_alloc(obj_size_t obj_size) {
@@ -691,14 +784,11 @@ void rlu_sync_checkpoint(rlu_thread_data_t *self) {
 		return;
 	}
 
-	self->n_sync_requests++;
 	rlu_sync_and_writeback(self);
 
 }
 
 void rlu_reader_lock(rlu_thread_data_t *self) {
-	self->n_starts++;
-
 	rlu_sync_checkpoint(self);
 
 	rlu_reset(self);
@@ -706,29 +796,43 @@ void rlu_reader_lock(rlu_thread_data_t *self) {
 	rlu_register_thread(self);
 
 	self->is_steal = 1;
-
+#ifndef RLU_ORDO_TIMESTAMPING
 	if ((self->local_version - self->local_commit_version) == 0) {
 		self->is_steal = 0;
 	}
+#endif
 
 	self->is_check_locks = 1;
-	
+#ifndef RLU_ORDO_TIMESTAMPING
 	if (((self->local_version - self->local_commit_version) == 0) && ((self->ws_tail_counter - self->ws_wb_counter) == 0)) {
 		self->is_check_locks = 0;
-		self->n_pure_readers++;
+	}
+#endif
+}
+
+int rlu_try_writer_lock(rlu_thread_data_t *self, int writer_lock_id) {
+	RLU_ASSERT(self->type == RLU_TYPE_COARSE_GRAINED);
+	
+	if (!rlu_try_acquire_writer_lock(self, writer_lock_id)) {
+		return 0;
 	}
 	
+	rlu_add_writer_lock(self, writer_lock_id);
+	
+	return 1;
 }
 
 void rlu_reader_unlock(rlu_thread_data_t *self) {
-	self->n_finish++;
-
 	rlu_unregister_thread(self);
 
 	if (self->is_write_detected) {
 		self->is_write_detected = 0;
 		rlu_commit_write_set(self);
-	}
+		rlu_release_writer_locks(self, WS_INDEX(self->ws_tail_counter - 1));
+	} else {
+		rlu_release_writer_locks(self, self->ws_cur_id);
+		rlu_reset_writer_locks(self, self->ws_cur_id);
+	} 
 	
 	rlu_sync_checkpoint(self);
 
@@ -767,14 +871,20 @@ intptr_t *rlu_deref_slow_path(rlu_thread_data_t *self, intptr_t *p_obj) {
 
 	// p_obj is locked by another thread
 	if (self->is_steal) {
+#ifdef RLU_ORDO_TIMESTAMPING
+		int rc;
+		rc = ordo_cmp_clock(g_rlu_threads[th_id]->writer_version,
+				    self->local_version);
+		if ((self->is_steal) && rc == ORDO_LESS_THAN) {
+#else
 		if (g_rlu_threads[th_id]->writer_version <= self->local_version) {
+#endif
 			// This thread started after the other thread updated g_writer_version.
 			// and this thread observed a valid p_obj_copy (!= NULL)
 			// => The other thread is going to wait for this thread to finish before reusing the write-set log
 			//    (to which p_obj_copy points)
 			TRACE_1(self, "take copy from other writer th_id = %ld p_obj = %p p_obj_copy = %p\n",
 				th_id, p_obj, p_obj_copy);
-			self->n_steals++;
 			return p_obj_copy;
 		}
 	}
@@ -872,16 +982,24 @@ int rlu_try_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, size_t obj_size) {
 
 }
 
-void rlu_abort(rlu_thread_data_t *self) {
-	self->n_aborts++;
+void rlu_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, unsigned int obj_size) {
+	RLU_ASSERT(self->type == RLU_TYPE_COARSE_GRAINED);
+	
+	RLU_ASSERT(rlu_try_lock(self, p_p_obj, obj_size) != 0);
+}
 
+void rlu_abort(rlu_thread_data_t *self) {
 	rlu_unregister_thread(self);
 
 	if (self->is_write_detected) {
 		self->is_write_detected = 0;
 		rlu_unlock_objs(self, self->ws_tail_counter);
 		
+		rlu_release_writer_locks(self, self->ws_cur_id);
 		rlu_reset_write_set(self, self->ws_tail_counter);
+	} else {
+		rlu_release_writer_locks(self, self->ws_cur_id);
+		rlu_reset_writer_locks(self, self->ws_cur_id);
 	}
 
 	rlu_sync_checkpoint(self);

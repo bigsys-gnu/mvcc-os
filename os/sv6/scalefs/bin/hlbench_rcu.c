@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <pthread.h>
 #include "urcu.h"
+#include "user.h"
 #include "libutil.h"
 #include <time.h>
 
@@ -84,7 +85,6 @@ typedef struct thread_param {
   unsigned short seed[3];
 } thread_param_t;
 
-struct rcu_maintain rcu_global;
 static pthread_barrier_t bar;
 int n_buckets = DEFAULT_BUCKETS;
 int initial = DEFAULT_INITIAL;
@@ -176,7 +176,7 @@ int list_insert(int key, list_t *list)
 
 }
 
-int list_delete(int key, list_t *list, struct rcu_data *d)
+int list_delete(int key, list_t *list)
 {
   node_t *prev, *cur;
   int ret = 0;
@@ -193,18 +193,18 @@ int list_delete(int key, list_t *list, struct rcu_data *d)
     }
   }
   pthread_spin_unlock(&list->l);
-  rcu_synchronize(&rcu_global, d);
+  RCU_SYNCHRONIZE();
   free(cur);
 
   return ret;
 }
 
-int list_find(int key, list_t *list, struct rcu_data *d)
+int list_find(int key, list_t *list)
 {
   node_t *cur;
   int value = -1;
 
-  rcu_reader_lock(&rcu_global, d);
+  RCU_READER_LOCK();
   cur = list->head;
 
   while(cur != NULL)
@@ -218,7 +218,7 @@ int list_find(int key, list_t *list, struct rcu_data *d)
 	cur = cur->next;
   }
 
-  rcu_reader_unlock(&rcu_global, d);
+  RCU_READER_UNLOCK();
   return value;
 }
 
@@ -226,7 +226,6 @@ void *test(void* param)
 {
   int op, bucket, value;
   value = 1;//sys_uptime();
-  struct rcu_data self;
 
   thread_param_t *p_data = (thread_param_t*)param; 
   hash_list_t *p_hash_list = p_data->p_hash_list;
@@ -234,7 +233,7 @@ void *test(void* param)
   if (setaffinity((p_data->id + 1) % NCPU) < 0)
     die("Error setaffinity\n");
 
-  rcu_register(&rcu_global, &self);
+  RCU_THREAD_INIT(p_data->id);
   pthread_barrier_wait(&bar);
 
   while (*p_data->stop == 0)
@@ -256,7 +255,7 @@ void *test(void* param)
       }
       else
       {
-        if (list_delete(value, p_list, &self))
+        if (list_delete(value, p_list))
         {
           p_data->variation--;
         }
@@ -265,14 +264,14 @@ void *test(void* param)
     }
     else
     {
-      if(list_find(value, p_list, &self) >= 0)
+      if(list_find(value, p_list) >= 0)
       {
         p_data->result_found++;
       }
       p_data->result_contains++;
     }
   }
-
+  RCU_THREAD_FINISH();
   printf("thread %d end\n", p_data->id);
   return NULL;
 }
@@ -310,7 +309,7 @@ int main(int argc, char **argv)
     printf("%d Option is inserted\n", argc - 1);
     break;
   }
-  printf("\n#### Chained hash table for RCU user-level ####\n");
+  printf("\n#### mvcc bench ####\n");
   printf( "-Nb threads   : %d\n", nb_threads);
   printf( "-Initial size : %d\n", initial);
   printf( "-Buckets      : %d\n", n_buckets);
@@ -363,7 +362,7 @@ int main(int argc, char **argv)
     }
   printf("done\n");
 
-  rcu_init(&rcu_global, nb_threads);
+  RCU_INIT(nb_threads);
 
   thread_list = (pthread_t *)malloc(nb_threads*sizeof(pthread_t));
   if (thread_list == NULL) {

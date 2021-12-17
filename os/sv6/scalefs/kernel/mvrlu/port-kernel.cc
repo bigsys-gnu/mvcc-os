@@ -101,16 +101,6 @@ void port_free(void *ptr)
 
 void port_cpu_relax_and_yield(void)
 {
-  int num = 0;
-  while (mycpu()->ncli)
-  {
-    num++;
-    popcli();
-  }
-  yield();
-  while (mycpu()->ncli < num)
-    pushcli();
-  cpu_relax();
 }
 
 void port_spin_init(spinlock_t *lock)

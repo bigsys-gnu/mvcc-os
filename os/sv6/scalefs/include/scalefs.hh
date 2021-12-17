@@ -9,7 +9,9 @@
 #include <vector>
 #include <algorithm>
 #include "chainhash.hh"
+#if USE_MVRLU_SCALEFS
 #include "mvrlu/chainhash.hh"
+#endif
 
 class mnode;
 class transaction;

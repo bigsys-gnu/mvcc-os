@@ -26,40 +26,80 @@
  * Authors Maya Arbel and Adam Morrison 
  */
 
-#include "urcu.h"
-#include "pthread.h"
+#define URCU_MAX_FREE_PTRS (1000)
 
-#define assert(CONDITION)\
-  if (!(CONDITION))	{	 \
-	printf(#CONDITION);	 \
-    exit(0);          }    \
-
-#define RCU_MAX_FREE_PTRS (1000)
-#define MAX_SPIN_LOCKS (10)
-#define MAX_THREADS (35)
-
-struct rcu_data {
-  long *times;  
-  int id;
-};
+#if !defined(EXTERNAL_RCU)
 
 typedef struct rcu_node_t {
     volatile long time; 
 	int f_size;
+	void *free_ptrs[URCU_MAX_FREE_PTRS];
 	char p[184];
 } rcu_node;
 
-/* rcu_maintain is for rcu maintain thread. */
-struct rcu_maintain {
-  int threads;
-  rcu_node **rcu_table;
-};
+void urcu_init(int num_threads);
+void urcu_reader_lock();
+void urcu_reader_unlock();
+void urcu_writer_lock(int lock_id);
+void urcu_writer_unlock(int lock_id);
+void urcu_synchronize(); 
+void urcu_register(int id);
+void urcu_unregister();
+void urcu_free(void *ptr);
 
-void rcu_init(struct rcu_maintain *rm, int num_threads);
-void rcu_reader_lock(struct rcu_maintain *rm, struct rcu_data *d);
-void rcu_reader_unlock(struct rcu_maintain *rm, struct rcu_data *d);
-void rcu_synchronize(struct rcu_maintain *rm, struct rcu_data *d);
-void rcu_register(struct rcu_maintain *rm, struct rcu_data *d);
-void rcu_unregister(struct rcu_data *d);
+#else
 
-#endif /* _K_RCU_H_ */
+#include <urcu.h>
+
+static inline void initURCU(int num_threads)
+{
+    rcu_init();
+}
+
+static inline void urcu_register(int id)
+{
+    rcu_register_thread();
+}
+
+static inline void urcu_unregister()
+{
+    rcu_unregister_thread();
+}
+
+static inline void urcu_read_lock()
+{
+    rcu_read_lock();
+}
+
+static inline void urcu_read_unlock()
+{
+    rcu_read_unlock();
+}
+
+static inline void urcu_synchronize()
+{
+    synchronize_rcu();
+}
+
+#endif  /* EXTERNAL RCU */ 
+
+//////////
+
+#define RCU_PRINT_STATS()
+#define RCU_INIT(n_threads)      urcu_init(n_threads)
+#define RCU_THREAD_INIT(th_id)   urcu_register(th_id)
+#define RCU_THREAD_FINISH()      /* */
+#define RCU_READER_LOCK()        urcu_reader_lock()
+#define RCU_READER_UNLOCK()      urcu_reader_unlock()
+#define RCU_WRITER_LOCK(lock_id)        urcu_writer_lock(lock_id)
+#define RCU_WRITER_UNLOCK(lock_id)      urcu_writer_unlock(lock_id)
+#define RCU_SYNCHRONIZE()        urcu_synchronize()
+#define RCU_FREE(p_obj)          urcu_free(p_obj)
+
+#define RCU_ASSIGN_PTR(p_ptr, p_obj) (*p_ptr) = p_obj									
+#define RCU_DEREF(p_obj) (p_obj)
+
+
+//////////
+
+#endif /* _NEW_URCU_H_ */

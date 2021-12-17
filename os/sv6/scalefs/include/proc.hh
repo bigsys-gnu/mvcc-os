@@ -112,8 +112,9 @@ struct proc {
   u64 magic;
   uptr unmapped_hint;
   sigaction sig[NSIG];
-
+#if USE_MVRLU_SCALEFS
   mvrlu::thread_handle handle;
+#endif
 
   static proc* alloc();
   void         set_state(procstate_t s);

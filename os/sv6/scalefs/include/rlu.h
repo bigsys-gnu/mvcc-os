@@ -24,21 +24,27 @@ typedef long intptr_t; // Hack for kernel that does not have intptr_t
 /////////////////////////////////////////////////////////////////////////////////////////
 // DEFINES - CONFIGURATION
 /////////////////////////////////////////////////////////////////////////////////////////
+//#define RLU_TIME_MEASUREMENT
 #define RLU_TYPE_FINE_GRAINED (1)
 #define RLU_TYPE_COARSE_GRAINED (2)
 #define RLU_TYPE RLU_TYPE_FINE_GRAINED
 #define RLU_NUM_WS 1
 
-#define RLU_MAX_THREADS (45)
+#define RLU_MAX_THREADS (450)
 
-#define RLU_MAX_WRITE_SETS (2) // Minimum value is 2
-#define RLU_MAX_FREE_NODES (10)
+#define RLU_MAX_WRITE_SETS (200) // Minimum value is 2
+#define RLU_MAX_FREE_NODES (100000)
 
-#define RLU_MAX_WRITE_SET_BUFFER_SIZE (1000)
+#define RLU_MAX_WRITE_SET_BUFFER_SIZE (100000)
 
-/* #define RLU_ENABLE_TRACE_1 */
-/* #define RLU_ENABLE_TRACE_2 */
-/* #define RLU_ENABLE_TRACE_3 */
+#define RLU_MAX_NESTED_WRITER_LOCKS (20)
+#define RLU_MAX_WRITER_LOCKS (20000)
+
+#define RLU_GENERAL_WRITER_LOCK (RLU_MAX_WRITER_LOCKS-1)
+
+//#define RLU_ENABLE_TRACE_1
+//#define RLU_ENABLE_TRACE_2
+//#define RLU_ENABLE_TRACE_3
 
 /////////////////////////////////////////////////////////////////////////////////////////
 // DEFINES - INTERNAL
@@ -62,6 +68,10 @@ typedef long intptr_t; // Hack for kernel that does not have intptr_t
 /////////////////////////////////////////////////////////////////////////////////////////
 typedef size_t obj_size_t;
 
+#ifdef RLU_TIME_MEASUREMENT
+typedef unsigned long long ticks;
+#endif
+
 typedef struct rlu_obj_header {
 	volatile intptr_t *p_obj_copy;
 } rlu_obj_header_t;
@@ -73,7 +83,13 @@ typedef struct rlu_ws_obj_header {
 	volatile long thread_id;
 } rlu_ws_obj_header_t;
 
+typedef struct writer_locks {
+	long size;
+	long ids[RLU_MAX_NESTED_WRITER_LOCKS];
+} writer_locks_t;
+
 typedef struct obj_list {
+	volatile writer_locks_t writer_locks;
 	unsigned int num_of_objs;
 	volatile intptr_t *p_cur;
 	volatile unsigned char buffer[RLU_MAX_WRITE_SET_BUFFER_SIZE];
@@ -124,21 +140,6 @@ typedef struct rlu_thread_data {
 	intptr_t *free_nodes[RLU_MAX_FREE_NODES];
 
 	long padding_5[RLU_DEFAULT_PADDING];
-
-	long n_starts;
-	long n_finish;
-	long n_writers;
-	long n_writer_writeback;
-	long n_pure_readers;
-	long n_aborts;
-	long n_steals;
-	long n_writer_sync_waits;
-	long n_writeback_q_iters;
-	long n_sync_requests;
-	long n_sync_and_writeback;
-
-	long padding_6[RLU_DEFAULT_PADDING];
-
 } rlu_thread_data_t;
 
 /////////////////////////////////////////////////////////////////////////////////////////
@@ -161,6 +162,9 @@ void rlu_reader_unlock(rlu_thread_data_t *self);
 
 int rlu_try_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, size_t obj_size);
 void rlu_abort(rlu_thread_data_t *self);
+
+int rlu_try_writer_lock(rlu_thread_data_t *self, int writer_lock_id);
+void rlu_lock(rlu_thread_data_t *self, intptr_t **p_p_obj, unsigned int obj_size);
 
 intptr_t *rlu_deref_slow_path(rlu_thread_data_t *self, intptr_t *p_obj);
 
@@ -185,6 +189,9 @@ void rlu_sync_checkpoint(rlu_thread_data_t *self);
 
 #define RLU_ALLOC(obj_size) ((void *)rlu_alloc(obj_size))
 #define RLU_FREE(self, p_obj) rlu_free(self, (intptr_t *)p_obj)
+
+#define RLU_TRY_WRITER_LOCK(self, writer_lock_id) rlu_try_writer_lock(self, writer_lock_id)
+#define RLU_LOCK(self, p_p_obj) rlu_lock(self, (intptr_t **)p_p_obj, sizeof(**p_p_obj))
 
 #define RLU_TRY_LOCK(self, p_p_obj) rlu_try_lock(self, (intptr_t **)p_p_obj, sizeof(**p_p_obj))
 #define RLU_TRY_LOCK_CONST(self, obj) RLU_TRY_LOCK(self, &(obj))
