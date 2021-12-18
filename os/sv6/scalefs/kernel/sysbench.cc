@@ -15,6 +15,9 @@
 #include "chainhash_spinlock.hh"
 #include "mvcc_kernel_bench.h"
 #include "hash.hh"
+#include "rlu.hh"
+#include "rlu.h"
+#include "utility"
 
 #define HASH_VALUE(p_hash_list, val)       (val % p_hash_list.n_buckets)
 template <typename T>
@@ -58,7 +61,8 @@ enum sync_type {
   SPINLOCK = 0,
   MVRLU = 1,
   RCU = 2,
-  SPIN_CHAIN = 3
+  SPIN_CHAIN = 3,
+  RLU = 4
 };
 //////////////////////////////////////
 // RANDOM FUNCTIONS
@@ -177,7 +181,7 @@ struct thread_param {
   NEW_DELETE_OPS(thread_param<T>);
 };
 template <typename T>
-void test(void *param) {}
+void test(void *param);
 
 template <typename T>
 void bench_init(void) {}
@@ -509,6 +513,7 @@ void test<spin_chain_bench>(void *param) {
 /////////////////////////////////////
 struct mvrlu_bench: public bench_trait {
   using data_structure = hash_list<mvrlu_bench>;
+  using thread_data = mvrlu::thread_handle;
 };
 
 struct mvrlu_node {
@@ -675,12 +680,12 @@ void bench_finish<mvrlu_bench>(void) {
   mvrlu_finish();
 }
 
-template <>
-void test<mvrlu_bench>(void *param) {
+template <typename T>
+void test(void *param) {
   int op, value;
-  auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
+  auto *p_data = reinterpret_cast<thread_param<T> *>(param);
   auto &hash_list = *p_data->hl;
-  auto *handle = new mvrlu::thread_handle();
+  typename T::thread_data handle;
 
   wait_on_barrier();
 
@@ -696,7 +701,7 @@ void test<mvrlu_bench>(void *param) {
         {
           if ((op & 0x01) == 0)
             {
-              if (p_list->list_insert(*handle, value))
+              if (p_list->list_insert(handle, value))
                 {
                   p_data->variation++;
                 }
@@ -704,7 +709,7 @@ void test<mvrlu_bench>(void *param) {
             }
           else
             {
-              if (p_list->list_delete(*handle, value))
+              if (p_list->list_delete(handle, value))
                 {
                   p_data->variation--;
                 }
@@ -713,18 +718,175 @@ void test<mvrlu_bench>(void *param) {
         }
       else
         {
-          if(p_list->list_find(*handle, value) >= 0)
+          if(p_list->list_find(handle, value) >= 0)
             {
               p_data->result_found++;
             }
           p_data->result_contains++;
         }
     }
-  delete handle;
   cprintf("thread %d end\n", myproc()->pid);
 }
 //////////////////////////////////////
 // MVRLU FINISH
+/////////////////////////////////////
+//////////////////////////////////////
+// RLU START
+/////////////////////////////////////
+struct rlu_bench: public bench_trait {
+  using data_structure = hash_list<rlu_bench>;
+  using thread_data = rlu::thread_handle;
+};
+
+struct rlu_node {
+  int value;
+  rlu_node *next;
+
+  rlu_node(int val): value(val), next(nullptr) {}
+
+  RLU_NEW_DELETE(rlu_node);
+};
+
+template <>
+class list<rlu_bench> {
+  rlu_node *head_;
+public:
+  list():head_(new rlu_node(0)) {}
+  ~list() {
+    for (auto iter = head_; iter != nullptr;)
+    {
+      auto trash = iter;
+      iter = iter->next;
+      delete trash;
+    }
+  }
+
+  int list_insert(rlu::thread_handle &h, int key) {
+    rlu_node *prev, *cur;
+    int ret = 0;
+
+  restart:
+    h.reader_lock();
+    for (prev = h.deref_ptr(head_), cur = h.deref_ptr(prev->next); ;
+         prev = cur, cur = h.deref_ptr(cur->next))
+    {
+      if (cur == NULL || cur->value > key)
+      {
+        if (!h.try_lock(&prev) ||
+            !h.try_lock(&cur))
+        {
+          h.abort();
+          goto restart;
+        }
+        auto new_node = new rlu_node(key);
+        rlu::assign_pointer(&new_node->next, cur);
+        rlu::assign_pointer(&prev->next, new_node);
+        ret = 1;
+        break;
+      }
+      else if (cur->value == key)
+        break;
+    }
+    h.reader_unlock();
+    return ret;
+  }
+
+  int list_delete(rlu::thread_handle &h, int key) {
+    rlu_node *prev, *cur;
+    int ret = 0;
+
+  restart:
+    h.reader_lock();
+    for (prev = h.deref_ptr(head_), cur = h.deref_ptr(prev->next); cur != NULL;
+         prev = cur, cur = h.deref_ptr(cur->next))
+    {
+      if (cur->value == key)
+      {
+        if (!h.try_lock(&prev) ||
+            !h.try_lock_const(cur))
+        {
+          h.abort();
+          goto restart;
+        }
+        auto *cur_n = h.deref_ptr(cur->next);
+        rlu::assign_pointer(&prev->next, cur_n);
+        h.free(cur);
+        ret = 1;
+        break;
+      }
+    }
+    h.reader_unlock();
+    return ret;
+  }
+
+  int list_find(rlu::thread_handle &h, int key) {
+    int value = -1;
+
+    h.reader_lock();
+    auto *cur = h.deref_ptr(head_);
+
+    while (cur && cur->value < key)
+      cur = h.deref_ptr(cur->next);
+
+    if (cur && cur->value == key)
+      value = cur->value;
+
+    h.reader_unlock();
+    return value;
+  }
+
+  int raw_insert(int key) {
+    rlu_node *prev, *cur;
+    int ret = 0;
+
+    for (prev = head_, cur = prev->next; cur != NULL;
+         prev = cur, cur = cur->next)
+      {
+        if (key < cur->value)
+          {
+            ret = 1;
+            auto new_node = new rlu_node(key);
+            new_node->next = cur;
+            prev->next = new_node;
+            return ret;
+          }
+        else if(key == cur->value)
+          return ret;               // already exists
+      }
+
+    if (cur == NULL)
+      {
+        ret = 1;
+        auto new_node = new rlu_node(key);
+        new_node->next = cur;
+        prev->next = new_node;
+      }
+    return ret;
+  }
+
+  int get_total_node_num(void) {
+    int total_num = 0;
+    for (auto iter = head_->next; iter != NULL; iter = iter->next)
+      total_num++;
+    return total_num;
+  }
+
+  NEW_DELETE_OPS(list<rlu_bench>);
+};
+
+template <>
+void bench_init<rlu_bench>(void) {
+  ::rlu_init();
+}
+
+template <>
+void bench_finish<rlu_bench>(void) {
+  ::rlu_finish();
+}
+
+
+//////////////////////////////////////
+// RLU FINISH
 /////////////////////////////////////
 template <typename T>
 void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
@@ -834,6 +996,10 @@ sys_benchmark(void *arguments, void *retptr)
     break;
   case SPIN_CHAIN:
     bench<spin_chain_bench>(nb_threads, initial, n_buckets, duration,
+                            update, range, reinterpret_cast<kernel_bench_outcome *>(retptr));
+    break;
+  case RLU:
+    bench<rlu_bench>(nb_threads, initial, n_buckets, duration,
                             update, range, reinterpret_cast<kernel_bench_outcome *>(retptr));
     break;
   default:
