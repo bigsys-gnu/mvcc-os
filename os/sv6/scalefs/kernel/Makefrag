@@ -82,6 +82,7 @@ OBJS = \
 	eager_refcache.o \
 	disk.o \
 	zlib-decompress.o \
+	rlu.o \
 
 OBJS := $(addprefix $(O)/kernel/, $(OBJS))
 
