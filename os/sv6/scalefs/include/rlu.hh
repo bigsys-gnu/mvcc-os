@@ -77,12 +77,16 @@ namespace rlu {
     template <typename T>
     inline bool
     try_lock(T **p_p_obj) {
+      if (!*p_p_obj)
+        return true;
       return ::rlu_try_lock(self_, (intptr_t **)p_p_obj, sizeof(T));
     }
 
     template <typename T>
     inline bool
     try_lock_const(T *p_obj) {
+      if (!p_obj)
+        return true;
       return ::rlu_try_lock(self_, (intptr_t **)&p_obj, sizeof(T));
     }
 
