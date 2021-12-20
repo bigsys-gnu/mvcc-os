@@ -13,7 +13,7 @@ QEMU       ?= qemu-system-x86_64
 # Number of CPUs to emulate
 QEMUSMP    ?= 16
 # RAM to simulate (in MB)
-QEMUMEM    ?= 16384
+QEMUMEM    ?= 32768
 # Default hardware build target.  See param.h for others.
 HW         ?= qemu
 # Enable C++ exception handling in the kernel.
@@ -261,9 +261,10 @@ endif
 # User-provided QEMU options
 QEMUOPTS += $(QEMUEXTRA)
 QEMUOPTS += -enable-kvm
+QEMUOPTS += -cpu host
 
 qemu: $(KERN)
-	$(QEMU) $(QEMUOPTS) $(QEMUKVMFLAGS) -kernel $(KERN)
+	sudo $(QEMU) $(QEMUOPTS) $(QEMUKVMFLAGS) -kernel $(KERN)
 gdb: $(KERN)
 	$(QEMU) $(QEMUOPTS) $(QEMUKVMFLAGS) -kernel $(KERN) -s
 

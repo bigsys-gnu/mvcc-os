@@ -82,6 +82,7 @@ UPROGS_BIN= \
 	hlbench_spin\
 	pmutex\
 	condtest\
+	mvrlu_until\
 
 ifeq ($(HAVE_LWIP),y)
 UPROGS_BIN += \

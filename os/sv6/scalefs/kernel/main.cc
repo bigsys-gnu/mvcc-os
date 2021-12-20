@@ -12,7 +12,9 @@
 #include "apic.hh"
 #include "codex.hh"
 #include "mfs.hh"
+#if USE_MVRLU_SCALEFS
 #include "mvrlu/mvrlu.h"
+#endif
 
 void initpic(void);
 void initextpic(void);
@@ -234,8 +236,10 @@ cmain(u64 mbmagic, u64 mbaddr)
   initproc();      // process table
   initsched();     // scheduler run queues
   initgc();        // gc epochs and threads
-  initrefcache();  // Requires initsched
+#if USE_MVRLU_SCALEFS
   mvrlu_init();    // before first process creation.
+#endif
+  initrefcache();  // Requires initsched
   initidle();
   initconsole();
   initfutex();

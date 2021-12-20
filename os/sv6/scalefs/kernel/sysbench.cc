@@ -4,13 +4,14 @@
 
 #include "types.h"
 #include "amd64.h"
+#include "compiler.h"
 #include "kernel.hh"
 #include "spinlock.hh"
 #include "condvar.hh"
 #include "proc.hh"
 #include "cpu.hh"
-#include "sorted_chainhash.hh"
 #include "mvrlu/mvrlu.hh"
+#include "sorted_chainhash.hh"
 #include "chainhash_spinlock.hh"
 #include "mvcc_kernel_bench.h"
 #include "hash.hh"
@@ -39,6 +40,7 @@ struct bench_trait {
 /////////////////////////////////////
 condvar thread_bar("barrier");
 spinlock bar_lock("barrier");
+int stop = 0;             // shared by threads
 
 void wait_on_barrier(void) {
   scoped_acquire l(&bar_lock);
@@ -95,7 +97,6 @@ static inline int rand_range(int n, unsigned short *seed)
   return v;
 }
 ////////////////////////////////////////////////////////
-int stop = 0;             // shared by threads
 
 struct node {
   node *next;
@@ -162,15 +163,14 @@ struct thread_param {
   unsigned long result_remove;
   unsigned long result_contains;
   unsigned long result_found;
-  int &stop;
   unsigned short seed[3];
   typename T::data_structure *hl;
 
   thread_param(int n_buckets, int nb_threads, int update, int range,
-               int &stop, typename T::data_structure *hl)
+               typename T::data_structure *hl)
     :n_buckets(n_buckets), nb_threads(nb_threads), update(update),
      range(range), variation(0), result_add(0), result_remove(0),
-     result_contains(0), result_found(0), stop(stop), hl(hl) {
+     result_contains(0), result_found(0), hl(hl) {
     rand_init(seed);
   }
 
@@ -314,7 +314,7 @@ void test<spinlock_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -391,7 +391,7 @@ void test<rcu_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -465,7 +465,7 @@ void test<spin_chain_bench>(void *param) {
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -517,7 +517,25 @@ struct mvrlu_node {
 
   mvrlu_node(int val): value(val), next(NULL) {}
 
-  MVRLU_NEW_DELETE(mvrlu_node);
+  static void* operator new(unsigned long nbytes, const std::nothrow_t&) noexcept {
+    return mvrlu::mvrlu_alloc<mvrlu_node>();
+  }
+
+  static void* operator new(unsigned long nbytes) {
+    void *p = mvrlu_node::operator new(nbytes, std::nothrow);
+    if (p == nullptr)
+      throw_bad_alloc();
+    return p;
+  }
+
+  static void operator delete(void *p, const std::nothrow_t&) noexcept {
+    mvrlu::mvrlu_free(p);
+  }
+
+  static void operator delete(void *p) {
+    mvrlu_node::operator delete(p, std::nothrow);
+  }
+
 };
 
 template <>
@@ -526,43 +544,17 @@ class list<mvrlu_bench> {
 public:
   list(void):head_(new mvrlu_node(0)) {}
   ~list(void) {
-    while (pop());
+    for (auto iter = head_; iter != NULL; )
+    {
+      auto trash = iter;
+      iter = iter->next;
+      delete trash;
+    }
   }
 
-  int pop(void) {
-    mvrlu_node *iter;
-    mvrlu::thread_handle &h = myproc()->handle;
-
-  restart:
-    h.mvrlu_reader_lock();
-    iter = h.mvrlu_deref(head_->next);
-    if (!iter)
-    {
-      if (!h.mvrlu_try_lock(&head_))
-      {
-        h.mvrlu_abort();
-        goto restart;
-      }
-      h.mvrlu_free(head_);
-      head_ = nullptr;
-      return 0;
-    }
-    if (!h.mvrlu_try_lock(&head_) ||
-        !h.mvrlu_try_lock_const(iter))
-    {
-      h.mvrlu_abort();
-      goto restart;
-    }
-    mvrlu::mvrlu_assign_pointer(&head_->next, iter->next);
-    h.mvrlu_free(iter);
-    h.mvrlu_reader_unlock();
-    return 1;
-  }
-
-  int list_insert(int key) {
+  int list_insert(mvrlu::thread_handle &h, int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
-    mvrlu::thread_handle &h = myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -590,10 +582,9 @@ public:
     return ret;
   }
 
-  int list_delete(int key) {
+  int list_delete(mvrlu::thread_handle &h, int key) {
     mvrlu_node *prev, *cur;
     int ret = 0;
-    mvrlu::thread_handle &h = myproc()->handle;
 
   restart:
     h.mvrlu_reader_lock();
@@ -619,9 +610,8 @@ public:
     return ret;
   }
 
-  int list_find(int key) {
+  int list_find(mvrlu::thread_handle &h, int key) {
     int value = -1;
-    mvrlu::thread_handle &h = myproc()->handle;
 
     h.mvrlu_reader_lock();
     auto *cur = h.mvrlu_deref(head_);
@@ -667,16 +657,8 @@ public:
 
   int get_total_node_num(void) {
     int total_num = 0;
-    mvrlu::thread_handle &h = myproc()->handle;
-    mvrlu_node *iter;
-
-    h.mvrlu_reader_lock();
-    for (iter = h.mvrlu_deref(head_->next); iter != nullptr;
-         iter = h.mvrlu_deref(iter->next))
-    {
+    for (auto iter = head_->next; iter != NULL; iter = iter->next)
       total_num++;
-    }
-    h.mvrlu_reader_unlock();
     return total_num;
   }
 
@@ -684,16 +666,27 @@ public:
 };
 
 template <>
+void bench_init<mvrlu_bench>(void) {
+  mvrlu_init();
+}
+
+template <>
+void bench_finish<mvrlu_bench>(void) {
+  mvrlu_finish();
+}
+
+template <>
 void test<mvrlu_bench>(void *param) {
   int op, value;
   auto *p_data = reinterpret_cast<thread_param<mvrlu_bench> *>(param);
   auto &hash_list = *p_data->hl;
+  auto *handle = new mvrlu::thread_handle();
 
   wait_on_barrier();
 
   cprintf("thread %d Start\n", myproc()->pid);
   // need condition for barrier
-  while (p_data->stop == 0)
+  while (stop == 0)
     {
       op = rand_range(1000, p_data->seed);
       value = rand_range(p_data->range, p_data->seed);
@@ -703,7 +696,7 @@ void test<mvrlu_bench>(void *param) {
         {
           if ((op & 0x01) == 0)
             {
-              if (p_list->list_insert(value))
+              if (p_list->list_insert(*handle, value))
                 {
                   p_data->variation++;
                 }
@@ -711,7 +704,7 @@ void test<mvrlu_bench>(void *param) {
             }
           else
             {
-              if (p_list->list_delete(value))
+              if (p_list->list_delete(*handle, value))
                 {
                   p_data->variation--;
                 }
@@ -720,14 +713,14 @@ void test<mvrlu_bench>(void *param) {
         }
       else
         {
-          if(p_list->list_find(value) >= 0)
+          if(p_list->list_find(*handle, value) >= 0)
             {
               p_data->result_found++;
             }
           p_data->result_contains++;
         }
     }
-  myproc()->handle.mvrlu_flush_log();
+  delete handle;
   cprintf("thread %d end\n", myproc()->pid);
 }
 //////////////////////////////////////
@@ -765,7 +758,7 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
   for (int i = 0; i < nb_threads; i++)
   {
     param_list[i] = new thread_param<T>(n_buckets, nb_threads, update,
-                                               range, stop, hl);
+                                               range, hl);
   }
   for (int i = 0; i < nb_threads; i++)
   {
@@ -781,10 +774,11 @@ void bench(int nb_threads, int initial, int n_buckets, int duration, int update,
 
   sleep_usec(nsectime(), duration);
 
-  stop = 1;
+  barrier();
+  *((volatile int *)&stop) = 1;
   cprintf("join %d threads...\n", nb_threads);
 
-  sleep_usec(nsectime(), 4000); // wait for threads
+  sleep_usec(nsectime(), 6000); // wait for threads
 
   bench_finish<T>();
   cprintf(" done!\n");
@@ -845,7 +839,7 @@ sys_benchmark(void *arguments, void *retptr)
   default:
     cprintf("Wrong sync type! 0:spinlock 1:mvrlu 2:rcu+seqlock\n");
   }
-  stop = 0;
+  *((volatile int *)&stop) = 0;
   cprintf("Kernel Level Benchmark END\n");
 }
 //////////////////////////////////////
@@ -887,4 +881,10 @@ void print_outcome(typename T::data_structure &hl, thread_param<T> *param_list[]
   retptr->exp = exp;
   retptr->total_read = reads;
   retptr->total_update = updates;
+}
+
+//SYSCALL
+void
+sys_mvrlu_until(unsigned int until) {
+  change_mvrlu_until(until);
 }
