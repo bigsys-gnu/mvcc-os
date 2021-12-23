@@ -147,7 +147,6 @@ void change_mvrlu_until(unsigned int new_until);
 /*
  * Compatibility wrapper for RLU
  */
-typedef mvrlu_thread_struct_t rlu_thread_data_t;
 
 #define RLU_INIT() mvrlu_init()
 #define RLU_FINISH() mvrlu_finish()

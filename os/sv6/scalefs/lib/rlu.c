@@ -8,26 +8,23 @@
 // INCLUDES
 /////////////////////////////////////////////////////////////////////////////////////////
 
-#ifndef KERNEL
+#ifndef __KERNEL__
 # include <stdio.h>
 # include <stdlib.h>
-# include <string.h>
 # include <time.h>
+#else /* KERNEL */
+#include "mvrlu/port-kernel.h"
+# define printf(...) port_print_str(__VA_ARGS__)
+/* TODO */
+# define printf_err(...) 
+# define fprintf(arg, ...) 
+# define free(ptr) port_free(ptr)
+# define malloc(size) port_alloc_x(size, 0)
+#endif /* KERNEL */
 # define likely(x) __builtin_expect ((x), 1)
 # define unlikely(x) __builtin_expect ((x), 0)
-#else /* KERNEL */
-# include <linux/printk.h>
-# include <linux/string.h>
-# include <linux/slab.h>
-# include <linux/bug.h>
-# define printf(...) pr_info(__VA_ARGS__)
-/* TODO */
-# define printf_err(...) pr_err(__VA_ARGS__)
-# define fprintf(arg, ...) pr_err(__VA_ARGS__)
-# define free(ptr) kfree(ptr)
-# define malloc(size) kmalloc(size, GFP_KERNEL)
-#endif /* KERNEL */
 
+# include <string.h>
 #include "rlu.h"
 
 #ifdef RLU_ORDO_TIMESTAMPING

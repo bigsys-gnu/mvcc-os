@@ -81,7 +81,7 @@ typedef struct thread_param {
   int result_found;
   int *stop;
   hash_list_t *p_hash_list;
-  rlu_thread_data_t self; // for MV-RLU
+  mvrlu_thread_struct_t self; // for MV-RLU
   unsigned short seed[3]; // for MV-RLU
 } thread_param_t;
 
@@ -126,7 +126,7 @@ raw_list_insert(int key, list_t *list)
   return ret;
 }
 
-int list_insert(rlu_thread_data_t *self, int key, list_t *list)
+int list_insert(mvrlu_thread_struct_t *self, int key, list_t *list)
 {
   node_t *prev, *cur, *new_node;
   int ret = 0;
@@ -172,7 +172,7 @@ int list_insert(rlu_thread_data_t *self, int key, list_t *list)
   return ret;
 }
 
-int list_delete(rlu_thread_data_t *self, int key, list_t *list)
+int list_delete(mvrlu_thread_struct_t *self, int key, list_t *list)
 {
   node_t *prev, *cur, *cur_n;
   int ret = 0;
@@ -208,7 +208,7 @@ int list_delete(rlu_thread_data_t *self, int key, list_t *list)
   return ret;
 }
 
-int list_find(rlu_thread_data_t *self, int key, list_t *list)
+int list_find(mvrlu_thread_struct_t *self, int key, list_t *list)
 {
   node_t *cur;
   int value = -1;
@@ -239,7 +239,7 @@ void *test(void* param)
 
   thread_param_t *p_data = (thread_param_t*)param; 
   hash_list_t *p_hash_list = p_data->p_hash_list;
-  rlu_thread_data_t *self = &p_data->self;
+  mvrlu_thread_struct_t *self = &p_data->self;
 
   if (setaffinity((p_data->id + 1) % NCPU) < 0)
   {
