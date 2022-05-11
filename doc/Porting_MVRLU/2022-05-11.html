@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8"/>
+<title>Scalefs 진행상황</title>
+<meta name="author" content="Chang-Hui Kim"/>
+<meta name="description" content=""/>
+<meta name="keywords" content=""/>
+<style type="text/css">
+.underline { text-decoration: underline; }
+</style>
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.css"/>
+
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/reveal.js/dist/theme/black.css" id="theme"/>
+
+
+<!-- If the query includes 'print-pdf', include the PDF print sheet -->
+<script>
+    if( window.location.search.match( /print-pdf/gi ) ) {
+        var link = document.createElement( 'link' );
+        link.rel = 'stylesheet';
+        link.type = 'text/css';
+        link.href = 'https://cdn.jsdelivr.net/npm/reveal.js/css/print/pdf.css';
+        document.getElementsByTagName( 'head' )[0].appendChild( link );
+    }
+</script>
+</head>
+<body>
+<div class="reveal">
+<div class="slides">
+<section id="sec-title-slide"><h1 class="title">Scalefs 진행상황</h1><p class="subtitle"></p>
+<h2 class="author">Chang-Hui Kim</h2><h2 class="email"><a href="mailto:kch9001@gmail.com">kch9001@gmail.com</a></h2><h2 class="date">2022-04-28</h2><p class="date">Created: 2022-05-03 Tue 15:19</p>
+</section>
+<section>
+<section id="slide-orgbaa743b">
+<h2 id="orgbaa743b">MV-RLU 이식</h2>
+<div class="outline-text-2" id="text-orgbaa743b">
+</div>
+</section>
+<section id="slide-orgbb8801c">
+<h3 id="orgbb8801c">User Level</h3>
+<ul>
+<li>Scalefs에 없는 Pthread Lib 일부 구현</li>
+<li>이외에 다른 문제 없음</li>
+
+</ul>
+</section>
+<section id="slide-org0ea5443">
+<h3 id="org0ea5443">Kernel Level</h3>
+<ul>
+<li>Chanined Hash Table 동기화 시도</li>
+<li>Per Thread Log 할당에 문제</li>
+
+</ul>
+</section>
+<section id="slide-orgb7091b0">
+<h3 id="orgb7091b0">Kernel Level - Per Thread Log</h3>
+<ul>
+<li>vmalloc 사용시 page fault 과도하게 발생</li>
+<li>kmalloc을 이용해 구현한 임의의 로그 할당자 사용</li>
+<li>로그 할당자를 구현한 이유는 객체의 복사본 여부 확인시 Cache Miss 방지</li>
+
+</ul>
+</section>
+<section id="slide-org817bde2">
+<h3 id="org817bde2">Cache Miss 방지</h3>
+<div class="org-src-container">
+
+<pre  class="src src-C"   ><code trim><span style="color: #8be9fd; font-style: italic;">int</span> <span style="color: #50fa7b; font-weight: bold;">port_addr_in_log_region</span>(<span style="color: #8be9fd; font-style: italic;">void</span> *<span style="color: #f8f8f2; font-weight: bold;">addr__</span>)
+{
+<span style="color: #ffb86c;">#if</span> MVRLU_USE_VMALLOC
+  <span style="color: #8be9fd; font-style: italic;">unsigned</span> <span style="color: #8be9fd; font-style: italic;">long</span> <span style="color: #8be9fd; font-style: italic;">long</span> <span style="color: #f8f8f2; font-weight: bold;">addr</span> = (<span style="color: #8be9fd; font-style: italic;">unsigned</span> <span style="color: #8be9fd; font-style: italic;">long</span> <span style="color: #8be9fd; font-style: italic;">long</span>)addr__;
+  <span style="color: #ff79c6; font-weight: bold;">return</span> addr &gt;= KVMALLOC &amp;&amp; addr &lt; KVMALLOCEND;
+<span style="color: #ffb86c;">#else</span>
+  <span style="color: #ff79c6; font-weight: bold;">return</span> log_pool.addr_in_log_region(addr__);
+<span style="color: #ffb86c;">#endif</span>
+}
+</code></pre>
+</div>
+</section>
+<section id="slide-orgb1589ff">
+<h3 id="orgb1589ff">Cache Miss 방지</h3>
+<div class="org-src-container">
+
+<pre  class="src src-C"   ><code trim><span style="color: #ff79c6; font-weight: bold;">static</span> <span style="color: #ff79c6; font-weight: bold;">inline</span> <span style="color: #8be9fd; font-style: italic;">int</span> <span style="color: #50fa7b; font-weight: bold;">is_obj_actual</span>(<span style="color: #8be9fd; font-style: italic;">mvrlu_obj_hdr_t</span> *<span style="color: #f8f8f2; font-weight: bold;">obj_hdr</span>)
+{
+<span style="color: #ffb86c;">#ifdef</span> MVRLU_DISABLE_ADDR_ACTUAL_TYPE_CHECKING
+    <span style="color: #6272a4;">/* </span><span style="color: #6272a4;">Test object type based on its type information</span>
+<span style="color: #6272a4;">     * in the header. It may cause one cache miss.</span><span style="color: #6272a4;"> */</span>
+    <span style="color: #ff79c6; font-weight: bold;">return</span> obj_hdr-&gt;type == TYPE_ACTUAL;
+<span style="color: #ffb86c;">#else</span>
+    <span style="color: #6272a4;">/* </span><span style="color: #6272a4;">Test if an object is in the log region or not.</span>
+<span style="color: #6272a4;">     * If not, it is an actual object. We avoid one</span>
+<span style="color: #6272a4;">     * memory reference so we may avoid one cache miss.</span><span style="color: #6272a4;"> */</span>
+    <span style="color: #ff79c6; font-weight: bold;">return</span> <span style="color: #8be9fd;">!</span>port_addr_in_log_region(obj_hdr);
+<span style="color: #ffb86c;">#endif</span> <span style="color: #6272a4;">/* </span><span style="color: #6272a4;">MVRLU_DISABLE_ADDR_ACTUAL_TYPE_CHECKING</span><span style="color: #6272a4;"> */</span>
+}
+</code></pre>
+</div>
+</section>
+<section id="slide-orgfe4bbaa">
+<h3 id="orgfe4bbaa">임의의 로그 할당자</h3>
+<ul>
+<li>임의의 로그 할당자는 spinlock으로 동기화</li>
+<li>빈번하게 Thread가 생성, 삭제되는 경우 성능 하락</li>
+<li>미리 대용량의 Memory를 할당받는 구조</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-org86f1977">
+<h2 id="org86f1977">Scalefs</h2>
+<ul>
+<li>Chained Hash Table</li>
+<li>Epoched based RCU로 동기화</li>
+<li>다른 객체의 참조를 가지는 노드 존재</li>
+<li>C++</li>
+
+</ul>
+</section>
+<section id="slide-orgdedc649">
+<h3 id="orgdedc649">RCU 사용 예시</h3>
+<ul>
+<li>RCU Read Section을 여러 함수에 거쳐 Nested하게 사용</li>
+<li>RCU Read Section에서 자료구조 재탐색</li>
+
+</ul>
+</section>
+<section id="slide-orgc2f62f5">
+<h3 id="orgc2f62f5">RCU 사용 예시</h3>
+<ul>
+<li>inum lookup에서 다시 RCU Read Section 진입</li>
+<li>이미 RCU Read Section이면 Counter만 증가</li>
+
+</ul>
+<div class="org-src-container">
+
+<pre  class="src src-C++"   ><code trim><span style="color: #6272a4;">// </span><span style="color: #6272a4;">Returns an sref to an inode if mnum is mapped to one.</span>
+<span style="color: #8be9fd; font-style: italic;">sref</span>&lt;inode&gt;
+<span style="color: #bd93f9;">mfs_interface</span>::<span style="color: #50fa7b; font-weight: bold;">get_inode</span>(<span style="color: #8be9fd; font-style: italic;">u64</span> <span style="color: #f8f8f2; font-weight: bold;">mnum</span>, <span style="color: #ff79c6; font-weight: bold;">const</span> <span style="color: #8be9fd; font-style: italic;">char</span> *<span style="color: #f8f8f2; font-weight: bold;">str</span>)
+{
+  <span style="color: #8be9fd; font-style: italic;">u64</span> <span style="color: #f8f8f2; font-weight: bold;">inum</span> = 0;
+
+  <span style="color: #ff79c6; font-weight: bold;">if</span> (<span style="color: #8be9fd;">!</span>inum_lookup(mnum, &amp;inum))
+    panic(<span style="color: #f1fa8c;">"%s: Inode mapping for mnode# %ld does not exist"</span>, str, mnum);
+
+  <span style="color: #ff79c6; font-weight: bold;">return</span> iget(1, inum);
+}
+</code></pre>
+</div>
+
+</section>
+<section id="slide-org0a2290d">
+<h3 id="org0a2290d">RCU 사용 예시</h3>
+<div class="org-src-container">
+
+<pre  class="src src-C++"   ><code trim><span style="color: #6272a4;">// </span><span style="color: #6272a4;">Reads in a file page from the disk.</span>
+<span style="color: #8be9fd; font-style: italic;">int</span>
+<span style="color: #bd93f9;">mfs_interface</span>::<span style="color: #50fa7b; font-weight: bold;">load_file_page</span>(<span style="color: #8be9fd; font-style: italic;">u64</span> <span style="color: #f8f8f2; font-weight: bold;">mfile_mnum</span>, <span style="color: #8be9fd; font-style: italic;">char</span> *<span style="color: #f8f8f2; font-weight: bold;">p</span>, <span style="color: #8be9fd; font-style: italic;">size_t</span> <span style="color: #f8f8f2; font-weight: bold;">pos</span>,
+                      <span style="color: #8be9fd; font-style: italic;">size_t</span> <span style="color: #f8f8f2; font-weight: bold;">nbytes</span>)
+{
+  <span style="color: #8be9fd; font-style: italic;">scoped_gc_epoch</span> <span style="color: #f8f8f2; font-weight: bold;">e</span>;
+  <span style="color: #8be9fd; font-style: italic;">sref</span>&lt;inode&gt; <span style="color: #f8f8f2; font-weight: bold;">i</span> = get_inode(mfile_mnum, <span style="color: #f1fa8c;">"load_file_page"</span>);
+  <span style="color: #ff79c6; font-weight: bold;">return</span> readi(i, p, pos, nbytes);
+}
+</code></pre>
+</div>
+
+</section>
+<section id="slide-org33b23cf">
+<h3 id="org33b23cf">참조를 가진 노드</h3>
+<div class="org-src-container">
+
+<pre  class="src src-C++"   ><code trim><span style="color: #8be9fd; font-style: italic;">chainhash</span>&lt;u64, <span style="color: #8be9fd; font-style: italic;">sleeplock</span>*&gt; *<span style="color: #f8f8f2; font-weight: bold;">mnum_to_lock</span>;
+<span style="color: #8be9fd; font-style: italic;">chainhash</span>&lt;u64, <span style="color: #8be9fd; font-style: italic;">mfs_logical_log</span>*&gt; *<span style="color: #f8f8f2; font-weight: bold;">metadata_log_htab</span>; <span style="color: #6272a4;">// </span><span style="color: #6272a4;">The logical log</span>
+</code></pre>
+</div>
+
+</section>
+<section id="slide-org2d8ed13">
+<h3 id="org2d8ed13">C++ 객체의 소멸자 문제</h3>
+<ul>
+<li>MV-RLU는 C 라이브러리이므로 소멸자 호출이 힘들다.</li>
+
+</ul>
+
+</section>
+<section id="slide-org710c74a">
+<h3 id="org710c74a">적용 방안</h3>
+<p>
+다음 부분을 수정해야 할 것으로 예상
+</p>
+<ul>
+<li>Scalefs (logical fs)</li>
+<li>file organization module</li>
+<li>basic file system</li>
+
+</ul>
+
+</section>
+</section>
+<section>
+<section id="slide-org9598296">
+<h2 id="org9598296">문제가 될 수 있는</h2>
+<ul>
+<li>ACPI 버전 호환 안될 가능성 존재</li>
+<li>Text Mode + BIOS 부팅만 가능</li>
+<li>몇몇 RAM 인식 못함</li>
+<li>Benchmark 실행 후 File System Anormaly</li>
+<li>컴파일러 버전 매우 낮음 (&#x2013;sys-root로 업그레이드 가능 예상)</li>
+
+</ul>
+</section>
+</section>
+</div>
+</div>
+<script src="https://cdn.jsdelivr.net/npm/reveal.js/dist/reveal.js"></script>
+
+<script>
+// Full list of configuration options available here:
+// https://github.com/hakimel/reveal.js#configuration
+Reveal.initialize({
+slideNumber: true,
+
+// Optional libraries used to extend on reveal.js
+dependencies: [
+ { src: 'https://cdn.jsdelivr.net/npm/reveal.js/plugin/markdown/marked.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'https://cdn.jsdelivr.net/npm/reveal.js/plugin/markdown/markdown.js', condition: function() { return !!document.querySelector( '[data-markdown]' ); } },
+ { src: 'https://cdn.jsdelivr.net/npm/reveal.js/plugin/zoom-js/zoom.js', async: true, condition: function() { return !!document.body.classList; } },
+ { src: 'https://cdn.jsdelivr.net/npm/reveal.js/plugin/notes/notes.js', async: true, condition: function() { return !!document.body.classList; } }]
+
+});
+
+</script>
+</body>
+</html>

@@ -1,0 +1,130 @@
+#+OPTIONS: num:nil toc:nil author:t date:t email:t
+#+REVEAL_INIT_OPTIONS: slideNumber: true
+#+REVEAL_TRANS: None
+#+REVEAL_THEME: black
+#+REVEAL_ROOT: https://cdn.jsdelivr.net/npm/reveal.js
+#+Title: Scalefs 진행상황
+#+AUTHOR: Chang-Hui Kim
+#+Email: kch9001@gmail.com
+#+DATE: 2022-04-28
+* COMMENT PPT의 목적과 내용
+이 PPT는 작년에 진행한 MVCC 과제에서 진행한 Scalefs에 MV-RLU 적용의 진행사항을 정리한다.
+우선 그 내용을 글로 다시 한번 정리할 필요가 있다. 우선 MV-RLU를 Scalefs의 User Level에 이식하는 작업을 수행했다.
+초반에는 문제가 있었지만 차후에 문제는 없어졌다. (Thread Lib 미비 등) Scalefs를 Kernel Level에서 동작하도록 이식하는
+작업을 그 다음으로 진행했는데 이 작업은 순탄치 않았다. 다양한 이유로 비정상적인 작동은 물론이고 성능하락까지 발생했다.
+또한 User Level에 이식할때와는 다르게 Kernel은 C++로 작성되어 있기 때문에 C로 작성된 MV-RLU 라이브러리를 C++로 Wrapping하는 과정을 거쳤다.
+그럼에도 불구하고 C++과 C의 차이로 인해 일반적인 C++ 객체를 MV-RLU로 그대로 관리하는 경우에 소멸자 호출불가 문제 등이 있었다.
+MV-RLU를 적용하려는 자료구조는 Chained Hash로 C++ Template을 이용해 범용적으로 작성되어 있었는데 기존에는 RCU를 이용해 동기화되던 것에 대신 MV-RLU를 적용했다.
+즉 기존의 RCU가 적용된 부분을 MV-RLU로 대체하려는 작업을 한것이다. 다만 RCU와 MV-RLU가 추구하는 동기화의 차이가 단순히 Chained Hash만 수정하는 것으로 작업을
+끝낼 수 없게 했다. RCU의 경우 복제본을 다수 생성하지 않는다. 또한 복제본을 공개하기 전까지는 다른 Thread가 그 복제본에 접근할 수 없다. 하지만 MV-RLU는 동시에 같은 데이터의 수많은 복제본이 만들어질 수 있다.
+또 다른 문제는 RCU의 경우 Read Section이 Section에 진입하는 시점의 데이터를 삭제하지 않고 보존하는 역할만 하기 때문에 최신의 데이터를 읽기 위해 Read Section을 나갈 필요가 없지만, MV-RLU의 경우 Read Section에
+진입하는 시점에 데이터의 snapshot을 보존하고 그 snapshot만 읽을 수 있기 때문에 최신의 데이터를 읽기 위해서는 Read Section에 재진입해야한다. 이러한 문제는 커널 전반에 RCU의 특성을 이용해 코드를 작성해 놓았기
+때문에 발생한다. 예로 Chained Hash 노드 중 하나의 Reference를 얻어서는 그 Reference를 여기 저기 함수들에서 돌려쓰는 것이다. 물론 이 과정은 모두 하나의 RCU Read Section에서 작동하도록 설계되어 있다.
+또 다른 제약사항은 Chained Hash로 관리되는 객체가 포인터를 포함하고 있는 경우이다. RCU의 경우 복사본이 하나밖에 없으므로 깊은 복사를 하지 않아도 문제가 되지 않지만, MV-RLU의 경우 여러개의 복사본이 생성되고 다수의
+Thread들이 깊은 복사가 이루어지지 않은 객체를 수정하면 포인터로 공유되는 동일 데이터를 Thread들이 망치게 된다. 그렇다고 깊은 복사를 하기에는 MV-RLU 특성상 힘들다. 그러므로 일단 깊은 복사가 필요없는 객체들을
+MV-RLU로 동기화하기로 한 것이다. 그 이외에 부가적인 문제는 다음과 같다. 일단 C++ 버전이 많이 낮다. 그리고 장치 에너지 관리 Driver인 ACPI의 버전도 많이 낮은 것으로 보인다. 또한 Scalefs를 컴파일하기 위해서는
+gcc가 --sys-root 옵션을 지원해야 하지만 최근에 apt등을 통해 배포되는 gcc는 그 옵션이 꺼진 상태로 컴파일되어 배포되는 바람에 사용할 수 없다는 작은 문제가 있다. 그냥 컴파일러를 컴파일하는 경험을 가지자.
+
+* MV-RLU 이식
+** User Level
+- Scalefs에 없는 Pthread Lib 일부 구현
+- 이외에 다른 문제 없음
+** Kernel Level
+- Chanined Hash Table 동기화 시도
+- Per Thread Log 할당에 문제
+** Kernel Level - Per Thread Log
+- vmalloc 사용시 page fault 과도하게 발생
+- kmalloc을 이용해 구현한 임의의 로그 할당자 사용
+- 로그 할당자를 구현한 이유는 객체의 복사본 여부 확인시 Cache Miss 방지
+** Cache Miss 방지
+#+BEGIN_SRC C
+  int port_addr_in_log_region(void *addr__)
+  {
+  #if MVRLU_USE_VMALLOC
+    unsigned long long addr = (unsigned long long)addr__;
+    return addr >= KVMALLOC && addr < KVMALLOCEND;
+  #else
+    return log_pool.addr_in_log_region(addr__);
+  #endif
+  }
+#+END_SRC
+** Cache Miss 방지
+#+BEGIN_SRC C
+  static inline int is_obj_actual(mvrlu_obj_hdr_t *obj_hdr)
+  {
+  #ifdef MVRLU_DISABLE_ADDR_ACTUAL_TYPE_CHECKING
+      /* Test object type based on its type information
+       ,* in the header. It may cause one cache miss. */
+      return obj_hdr->type == TYPE_ACTUAL;
+  #else
+      /* Test if an object is in the log region or not.
+       ,* If not, it is an actual object. We avoid one
+       ,* memory reference so we may avoid one cache miss. */
+      return !port_addr_in_log_region(obj_hdr);
+  #endif /* MVRLU_DISABLE_ADDR_ACTUAL_TYPE_CHECKING */
+  }
+#+END_SRC
+** 임의의 로그 할당자
+- 임의의 로그 할당자는 spinlock으로 동기화
+- 빈번하게 Thread가 생성, 삭제되는 경우 성능 하락
+- 미리 대용량의 Memory를 할당받는 구조
+
+* Scalefs
+- Chained Hash Table
+- Epoched based RCU로 동기화
+- 다른 객체의 참조를 가지는 노드 존재
+- C++
+** RCU 사용 예시
+- RCU Read Section을 여러 함수에 거쳐 Nested하게 사용
+- RCU Read Section에서 자료구조 재탐색
+** RCU 사용 예시
+- inum lookup에서 다시 RCU Read Section 진입
+- 이미 RCU Read Section이면 Counter만 증가
+#+BEGIN_SRC C++
+// Returns an sref to an inode if mnum is mapped to one.
+sref<inode>
+mfs_interface::get_inode(u64 mnum, const char *str)
+{
+  u64 inum = 0;
+
+  if (!inum_lookup(mnum, &inum))
+    panic("%s: Inode mapping for mnode# %ld does not exist", str, mnum);
+
+  return iget(1, inum);
+}
+#+END_SRC
+
+** RCU 사용 예시
+#+BEGIN_SRC C++
+// Reads in a file page from the disk.
+int
+mfs_interface::load_file_page(u64 mfile_mnum, char *p, size_t pos,
+		              size_t nbytes)
+{
+  scoped_gc_epoch e;
+  sref<inode> i = get_inode(mfile_mnum, "load_file_page");
+  return readi(i, p, pos, nbytes);
+}
+#+END_SRC
+
+** 참조를 가진 노드
+#+BEGIN_SRC C++
+  chainhash<u64, sleeplock*> *mnum_to_lock;
+  chainhash<u64, mfs_logical_log*> *metadata_log_htab; // The logical log
+#+END_SRC
+
+** C++ 객체의 소멸자 문제
+- MV-RLU는 C 라이브러리이므로 소멸자 호출이 힘들다.
+
+** 적용 방안
+다음 부분을 수정해야 할 것으로 예상
+- Scalefs (logical fs)
+- file organization module
+- basic file system
+
+* 문제가 될 수 있는
+- ACPI 버전 호환 안될 가능성 존재
+- Text Mode + BIOS 부팅만 가능
+- 몇몇 RAM 인식 못함
+- Benchmark 실행 후 File System Anormaly
+- 컴파일러 버전 매우 낮음 (--sys-root로 업그레이드 가능 예상)
